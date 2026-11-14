@@ -121,6 +121,9 @@ static func requirements(d: Dictionary, rocket: Dictionary) -> Array:
 			launch_lvl = LVL_FAIL
 		elif float(rocket["twr"]) < 1.2 or float(rocket["dv"]) < M1Parts.REQUIRED_DV:
 			launch_lvl = LVL_WARN
+		var rl := LVL_OK if float(rocket["rel"]) >= 0.88 else (LVL_WARN if float(rocket["rel"]) >= 0.8 else LVL_FAIL)
+		out.append({"id": "rel", "key": "REQ_REL", "level": rl, "value": "%d%%" % int(float(rocket["rel"]) * 100.0),
+			"hint": "REQH_REL"})
 		out.append({"id": "launch", "key": "REQ_LAUNCH", "level": launch_lvl,
 			"value": "TWR %.2f | dv %d" % [float(rocket["twr"]), int(rocket["dv"])], "hint": "REQH_LAUNCH"})
 	return out

@@ -1,4 +1,4 @@
-﻿extends Node3D
+extends Node3D
 ## Settings over the 3D launch pad. The ONLY place where the language can be changed.
 
 var _reset_armed := false
@@ -57,6 +57,16 @@ func _ready() -> void:
 	slider.custom_minimum_size = Vector2(0, 26)
 	slider.value_changed.connect(func(val: float): GameState.set_setting("volume", val))
 	v.add_child(slider)
+
+	v.add_child(UIKit.label("SET_SENS", 20, UIKit.C_ACCENT))
+	var sens := HSlider.new()
+	sens.min_value = 0.5
+	sens.max_value = 1.5
+	sens.step = 0.1
+	sens.value = float(GameState.settings["sens"])
+	sens.custom_minimum_size = Vector2(0, 26)
+	sens.value_changed.connect(func(val: float): GameState.set_setting("sens", val))
+	v.add_child(sens)
 
 	v.add_child(_toggle("SET_FULLSCREEN", "fullscreen"))
 	v.add_child(_toggle("SET_SHAKE", "shake"))

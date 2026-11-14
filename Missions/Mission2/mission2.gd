@@ -71,6 +71,8 @@ var _sample_t := 0.0
 var _data_mbit := 0.0
 var _battery_dead := false
 var _surf_hint_t := 0.0
+var _turn_s := 0.0
+var _steer_s := 0.0
 
 var _big: Label
 var _hint: Label
@@ -468,7 +470,8 @@ func _descent_input() -> Vector2:
 		turn += 1.0
 	if Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT):
 		turn -= 1.0
-	return Vector2(clampf(thr, 0.0, 1.0), turn)
+	_turn_s = move_toward(_turn_s, turn * float(GameState.settings["sens"]), 5.0 * get_process_delta_time())
+	return Vector2(clampf(thr, 0.0, 1.0), clampf(_turn_s, -1.0, 1.0))
 
 
 ## Test autopilot: cancel horizontal speed toward the pad, then hold a descent-rate profile.
@@ -609,7 +612,8 @@ func _rover_input() -> Vector2:
 		steer += 1.0
 	if Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT):
 		steer -= 1.0
-	return Vector2(drive, steer)
+	_steer_s = move_toward(_steer_s, steer * float(GameState.settings["sens"]), 5.0 * get_process_delta_time())
+	return Vector2(drive, clampf(_steer_s, -1.0, 1.0))
 
 
 func _next_poi() -> int:

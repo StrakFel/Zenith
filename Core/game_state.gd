@@ -5,6 +5,9 @@ signal settings_changed
 signal progress_changed
 
 const SAVE_PATH := "user://zenith_save.cfg"
+## Automated tests (godot --script ...) use their own file so they never touch the player's real progress.
+const TEST_SAVE_PATH := "user://zenith_test_save.cfg"
+var save_path: String = TEST_SAVE_PATH if OS.get_cmdline_args().has("--script") else SAVE_PATH
 
 var settings: Dictionary = {
 	"locale": "en",
@@ -12,6 +15,7 @@ var settings: Dictionary = {
 	"fullscreen": false,
 	"shake": true,
 	"unlock_all": false,
+	"sens": 1.0,   # control sensitivity multiplier (0.5 - 1.5)
 }
 ## mission_id -> {"completed": bool, "stars": int, "score": int}
 var progress: Dictionary = {}
@@ -86,12 +90,12 @@ func save_game() -> void:
 	for k in settings:
 		cfg.set_value("settings", k, settings[k])
 	cfg.set_value("progress", "data", JSON.stringify(progress))
-	cfg.save(SAVE_PATH)
+	cfg.save(save_path)
 
 
 func load_game() -> void:
 	var cfg := ConfigFile.new()
-	if cfg.load(SAVE_PATH) != OK:
+	if cfg.load(save_path) != OK:
 		return
 	for k in settings:
 		settings[k] = cfg.get_value("settings", k, settings[k])
@@ -99,6 +103,8 @@ func load_game() -> void:
 	if raw is Dictionary:
 		progress.clear()
 		for id in raw:
+			if MissionRegistry.find(str(id)).is_empty():
+				continue  # progress of removed / renamed missions
 			var e: Dictionary = raw[id]
 			progress[id] = {
 				"completed": bool(e.get("completed", false)),

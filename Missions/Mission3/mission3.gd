@@ -25,6 +25,7 @@ var review: DesignReview
 var _hud_root: Control
 var _big: Label
 var _launching := false
+var _sm := Vector3.ZERO
 var _lt := 0.0
 var _last_cd := -1
 const LAUNCH_COUNTDOWN := 3.0
@@ -258,6 +259,13 @@ func _process(delta: float) -> void:
 			rot -= 1.0
 		fine = Input.is_physical_key_pressed(KEY_SHIFT)
 		kill = Input.is_physical_key_pressed(KEY_X)
+		# smoothing: thrust ramps in/out over ~0.15 s (less jerky, finer control)
+		var k := 7.0 * delta
+		var sens := float(GameState.settings["sens"])
+		_sm = Vector3(move_toward(_sm.x, fwd, k), move_toward(_sm.y, strafe, k), move_toward(_sm.z, rot * sens, k))
+		fwd = _sm.x
+		strafe = _sm.y
+		rot = _sm.z
 	world.step(delta, fwd, strafe, rot, fine, kill)
 	if (absf(world.thrust_fx.x) + absf(world.thrust_fx.y) > 0.1 or absf(world.rot_fx) > 0.1) and not world.finished:
 		Sfx.loop("hiss", -17.0 if not fine else -25.0)

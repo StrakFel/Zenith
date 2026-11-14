@@ -33,6 +33,7 @@ var vt := 0.0
 var pitch := 0.0
 var throttle := 0.0
 var engine_on := false
+var thrust_scale := 1.0   # < 1 during an engine anomaly
 var on_pad := true
 var integrity := 100.0
 var crashed := false
@@ -90,7 +91,7 @@ func step(dt: float) -> void:
 	if engine_on and fuel > 0.0 and throttle > 0.0:
 		var p := exp(-h / SCALE_H)
 		var isp := lerpf(isp_vac, isp_sl, p)
-		thrust_now = max_thrust * throttle * (isp / isp_sl)
+		thrust_now = max_thrust * throttle * (isp / isp_sl) * thrust_scale
 		mdot = max_thrust * throttle / (isp_sl * G0)
 		fuel = maxf(0.0, fuel - mdot * dt)
 	var g := MU / (r * r)

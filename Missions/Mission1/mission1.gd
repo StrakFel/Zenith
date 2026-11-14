@@ -41,6 +41,11 @@ var _t_asm := 0.0
 var inspecting := false
 var cam_hint: CameraHint
 var dev_autopilot := false
+var summary: MissionSummary
+var _pitch_vel := 0.0
+var _anom_at := -1.0
+var _anom_end := -1.0
+var anomaly_seen := false
 var _ap_phase := 0
 
 
@@ -128,6 +133,20 @@ func _on_review_request(b: Dictionary) -> void:
 		state = S.ASSEMBLY)
 	review.launch_approved.connect(func():
 		review.queue_free()
+		_show_summary())
+
+
+## Final Mission Summary: everything that was decided, in one place, before the countdown.
+func _show_summary() -> void:
+	summary = MissionSummary.new()
+	world_layer.add_child(summary)
+	summary.setup(design, sat, build, stats)
+	summary.back_requested.connect(func():
+		summary.queue_free()
+		assembly.visible = true
+		state = S.ASSEMBLY)
+	summary.confirmed.connect(func():
+		summary.queue_free()
 		_on_launch(build))
 
 
@@ -230,6 +249,9 @@ func _on_launch(b: Dictionary) -> void:
 		return
 	model = FlightModel.new()
 	model.setup(stats)
+	# reliability decides whether an engine anomaly happens (random event, thrust -45 % for 9 s)
+	anomaly_seen = false
+	_anom_at = randf_range(15.0, 55.0) if randf() < (1.0 - float(stats["rel"])) * 4.0 else -1.0
 	# hand the camera back to the flight director (a free-look from the designer must not leak into flight)
 	pad_scene.orbit.disengage()
 	if assembly != null:
@@ -354,7 +376,10 @@ func _manual_input(delta: float) -> void:
 		var target := model.prograde_pitch()
 		model.pitch = move_toward(model.pitch, clampf(target, 0.0, PI), deg_to_rad(40.0) * delta)
 	else:
-		model.pitch = clampf(model.pitch + pitch_d * deg_to_rad(26.0) * delta, deg_to_rad(-15.0), deg_to_rad(185.0))
+		# smoothed pitch: the rate ramps up/down instead of snapping (more precise, less twitchy)
+		var sens := float(GameState.settings["sens"])
+		_pitch_vel = move_toward(_pitch_vel, pitch_d * deg_to_rad(26.0) * sens, deg_to_rad(110.0) * delta)
+		model.pitch = clampf(model.pitch + _pitch_vel * delta, deg_to_rad(-15.0), deg_to_rad(185.0))
 
 
 func _simulate(delta: float) -> void:
@@ -373,6 +398,17 @@ func _simulate(delta: float) -> void:
 			break
 	flight.sync()
 	_max_alt = maxf(_max_alt, model.altitude())
+	if _anom_at > 0.0 and model.time >= _anom_at:
+		_anom_at = -1.0
+		_anom_end = model.time + 9.0
+		anomaly_seen = true
+		model.thrust_scale = 0.55
+		_override_hint = "M1_HINT_ANOMALY"
+		_override_t = 6.0
+		Sfx.play("hit", -6.0)
+	if _anom_end > 0.0 and model.time >= _anom_end:
+		_anom_end = -1.0
+		model.thrust_scale = 1.0
 	# ---- end conditions
 	if model.integrity <= 0.0:
 		_fail("M1_FAIL_DESTROYED", true)
@@ -542,6 +578,7 @@ func _succeed() -> void:
 		["R_DATA_F", "%d%%" % int(float(sr["data_f"]) * 100.0)],
 		["R_DATA_GB", "%.1f GB" % float(sr["data_gb"])],
 		["R_FUEL_LEFT", "%d%%" % int(fuel_left * 100.0)],
+		["R_RELIABILITY", "%d%%%s" % [int(float(stats["rel"]) * 100.0), " (!)" if anomaly_seen else ""]],
 		["R_INTEGRITY", "%d%%" % int(model.integrity)],
 		["R_COST", "$%d / $%d" % [int(stats["cost"]), M1Parts.BUDGET]],
 		["R_SCORE", str(score)],
@@ -565,6 +602,8 @@ func _succeed() -> void:
 		tips.append("TIP_FUEL")
 	if model.max_q_seen > 0.9 * FlightModel.Q_LIMIT:
 		tips.append("TIP_MAXQ")
+	if anomaly_seen:
+		tips.append("TIP_REL")
 	if tips.is_empty():
 		tips.append("TIP_GOOD")
 	var extra := {"segments": segments, "science": science, "tips": tips,
