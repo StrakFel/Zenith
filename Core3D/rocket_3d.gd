@@ -238,7 +238,7 @@ func _build_fx() -> void:
 	pm.scale_curve = Fx3D.curve_tex([Vector2(0, 1), Vector2(1, 0.25)])
 	_fx_root.add_child(_plume)
 	# smoke trail in world space
-	_smoke = Fx3D.particles(160, 6.0, 9.0, false, false)
+	_smoke = Fx3D.particles(260, 7.0, 11.0, false, false)
 	var sm := Fx3D.pmat(_smoke)
 	sm.direction = Vector3(0, -1, 0)
 	sm.spread = 22.0
@@ -254,8 +254,8 @@ func _build_fx() -> void:
 	sm.angle_min = -180.0
 	sm.angle_max = 180.0
 	sm.color_ramp = Fx3D.gradient_tex(
-		[Color(0.95, 0.93, 0.9, 0.0), Color(0.88, 0.88, 0.9, 0.55), Color(0.55, 0.57, 0.62, 0.0)],
-		[0.0, 0.12, 1.0])
+		[Color(1.0, 0.82, 0.6, 0.0), Color(0.93, 0.9, 0.86, 0.5), Color(0.62, 0.63, 0.67, 0.3), Color(0.5, 0.52, 0.57, 0.0)],
+		[0.0, 0.08, 0.45, 1.0])
 	sm.scale_curve = Fx3D.curve_tex([Vector2(0, 0.4), Vector2(1, 2.6)])
 	_fx_root.add_child(_smoke)
 	_light = OmniLight3D.new()
@@ -284,12 +284,17 @@ func set_thrust(t: float, ambient: float, drift: Vector3) -> void:
 	_core.position = Vector3(0, -length * 0.275, 0)
 	_flame_mat.set_shader_parameter("intensity", t * 1.1)
 	_core_mat.set_shader_parameter("intensity", t * 1.25)
+	_flame_mat.set_shader_parameter("vac", vac)
+	_core_mat.set_shader_parameter("vac", vac)
+	# in vacuum the plume spreads and gets thinner; near the ground it is hot and dense
+	Fx3D.pmat(_plume).spread = 4.0 + 16.0 * vac
+	_plume.amount_ratio = lerpf(1.0, 0.45, vac)
 	_plume.emitting = on
 	Fx3D.pmat(_plume).initial_velocity_min = 40.0 + 40.0 * t
 	Fx3D.pmat(_plume).initial_velocity_max = 70.0 + 55.0 * t
 	_smoke.emitting = on and ambient > 0.03
 	Fx3D.pmat(_smoke).gravity = drift
-	_smoke.amount_ratio = clampf(ambient * 1.2, 0.05, 1.0)
+	_smoke.amount_ratio = clampf(ambient * 1.4, 0.05, 1.0)
 	_light.light_energy = t * 9.0 * (0.6 + 0.4 * ambient + 0.3)
 
 

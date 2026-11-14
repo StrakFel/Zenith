@@ -43,6 +43,9 @@ var cam_hint: CameraHint
 var dev_autopilot := false
 var summary: MissionSummary
 var _pitch_vel := 0.0
+var auto_warp := true          # time compression: boring parts are skipped unless the player takes over
+var _ms_done: Array[int] = []
+const MILESTONES := [[600.0, "M1_MS_TOWER"], [12000.0, "M1_MS_SKY"], [45000.0, "M1_MS_THIN"], [100000.0, "M1_MS_SPACE"]]
 var _anom_at := -1.0
 var _anom_end := -1.0
 var anomaly_seen := false
@@ -355,7 +358,20 @@ func _update_flight(delta: float) -> void:
 	_simulate(delta)
 
 
+func _auto_warp() -> void:
+	if not auto_warp:
+		return
+	var h := model.altitude()
+	if model.time < 10.0:
+		warp = 1                      # lift-off is shown in real time
+	elif h < 30000.0:
+		warp = 3
+	else:
+		warp = 4 if model.throttle > 0.05 else 8
+
+
 func _manual_input(delta: float) -> void:
+	_auto_warp()
 	# ---- player input
 	var thr_d := 0.0
 	if Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP):
@@ -384,7 +400,7 @@ func _manual_input(delta: float) -> void:
 
 func _simulate(delta: float) -> void:
 	# ---- time warp limits (careful in dense air)
-	var max_warp := 2 if model.altitude() < 30000.0 else 4
+	var max_warp := 3 if model.altitude() < 30000.0 else 8
 	if warp > max_warp:
 		warp = max_warp
 	# ---- simulate
@@ -398,6 +414,11 @@ func _simulate(delta: float) -> void:
 			break
 	flight.sync()
 	_max_alt = maxf(_max_alt, model.altitude())
+	for i in MILESTONES.size():
+		if not _ms_done.has(i) and model.altitude() >= float(MILESTONES[i][0]):
+			_ms_done.append(i)
+			hud.big(tr(str(MILESTONES[i][1])), UIKit.C_ACCENT)
+			Sfx.play("beep", -8.0)
 	if _anom_at > 0.0 and model.time >= _anom_at:
 		_anom_at = -1.0
 		_anom_end = model.time + 9.0
@@ -446,11 +467,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		KEY_T:
 			assist = not assist
 		KEY_1:
+			auto_warp = false
 			warp = 1
 		KEY_2:
+			auto_warp = false
 			warp = 2
 		KEY_3:
-			warp = 4 if model.altitude() >= 30000.0 else 2
+			auto_warp = true      # 3 = automatic time compression
 		KEY_SPACE:
 			_try_deploy()
 
@@ -580,7 +603,7 @@ func _succeed() -> void:
 		["R_FUEL_LEFT", "%d%%" % int(fuel_left * 100.0)],
 		["R_RELIABILITY", "%d%%%s" % [int(float(stats["rel"]) * 100.0), " (!)" if anomaly_seen else ""]],
 		["R_INTEGRITY", "%d%%" % int(model.integrity)],
-		["R_COST", "$%d / $%d" % [int(stats["cost"]), M1Parts.BUDGET]],
+		["R_COST", "%s / %s" % [Units.money(int(stats["cost"])), Units.money(M1Parts.BUDGET)]],
 		["R_SCORE", str(score)],
 	]
 	# four-segment evaluation

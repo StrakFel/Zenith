@@ -130,42 +130,42 @@ func _rebuild_options() -> void:
 	var o: Array = []
 	for id in LunarDesign.LAUNCHERS:
 		var d: Dictionary = LunarDesign.LAUNCHERS[id]
-		o.append([id, d["name"], "%s %s | $%d" % [Units.kg(float(d["tli_mass"])), tr("LUN_TO_TLI"), int(d["cost"])]])
+		o.append([id, d["name"], "%s %s | %s" % [Units.kg(float(d["tli_mass"])), tr("LUN_TO_TLI"), Units.money(int(d["cost"]))]])
 	_choice("LUN_OPT_LAUNCHER", "launcher", o)
 	o = []
 	for id in LunarDesign.ENGINES:
 		var d: Dictionary = LunarDesign.ENGINES[id]
-		o.append([id, d["name"], "Isp %d %s | %s | %s | $%d" % [int(d["isp"]), tr("UNIT_S"), Units.kn(float(d["thrust"])), Units.kg(float(d["mass"])), int(d["cost"])]])
+		o.append([id, d["name"], "Isp %d %s | %s | %s | %s" % [int(d["isp"]), tr("UNIT_S"), Units.kn(float(d["thrust"])), Units.kg(float(d["mass"])), Units.money(int(d["cost"]))]])
 	_choice("LUN_OPT_ENGINE", "engine", o)
 	o = []
 	for id in LunarDesign.TANKS:
 		var d: Dictionary = LunarDesign.TANKS[id]
-		o.append([id, d["name"], "%s %s | $%d" % [Units.kg(float(d["prop"])), tr("LUN_PROP"), int(d["cost"])]])
+		o.append([id, d["name"], "%s %s | %s" % [Units.kg(float(d["prop"])), tr("LUN_PROP"), Units.money(int(d["cost"]))]])
 	_choice("LUN_OPT_TANK", "tank", o)
 	o = []
 	for id in LunarDesign.ROVERS:
 		var d: Dictionary = LunarDesign.ROVERS[id]
-		o.append([id, d["name"], "%s | %.1f %s | $%d" % [Units.kg(float(d["mass"])), float(d["speed"]), tr("UNIT_MS"), int(d["cost"])]])
+		o.append([id, d["name"], "%s | %.1f %s | %s" % [Units.kg(float(d["mass"])), float(d["speed"]), tr("UNIT_MS"), Units.money(int(d["cost"]))]])
 	_choice("LUN_OPT_ROVER", "rover", o)
 	o = []
 	for id in LunarDesign.INSTRUMENTS:
 		var d: Dictionary = LunarDesign.INSTRUMENTS[id]
-		o.append([id, d["name"], "%s | %d %s | %.1f %s | $%d" % [Units.kg(float(d["mass"])), int(d["power"]), tr("UNIT_W"), float(d["data"]), tr("UNIT_MBPS"), int(d["cost"])]])
+		o.append([id, d["name"], "%s | %d %s | %.1f %s | %s" % [Units.kg(float(d["mass"])), int(d["power"]), tr("UNIT_W"), float(d["data"]), tr("UNIT_MBPS"), Units.money(int(d["cost"]))]])
 	_choice("LUN_OPT_INSTR", "instrument", o)
 	o = []
 	for id in LunarDesign.SOLAR:
 		var d: Dictionary = LunarDesign.SOLAR[id]
-		o.append([id, d["name"], "%d %s | %s | $%d" % [int(d["watts"]), tr("UNIT_W"), Units.kg(float(d["mass"])), int(d["cost"])]])
+		o.append([id, d["name"], "%d %s | %s | %s" % [int(d["watts"]), tr("UNIT_W"), Units.kg(float(d["mass"])), Units.money(int(d["cost"]))]])
 	_choice("LUN_OPT_SOLAR", "solar", o)
 	o = []
 	for id in LunarDesign.BATTERY:
 		var d: Dictionary = LunarDesign.BATTERY[id]
-		o.append([id, d["name"], "%d %s | %s | $%d" % [int(d["wh"]), tr("UNIT_WH"), Units.kg(float(d["mass"])), int(d["cost"])]])
+		o.append([id, d["name"], "%d %s | %s | %s" % [int(d["wh"]), tr("UNIT_WH"), Units.kg(float(d["mass"])), Units.money(int(d["cost"]))]])
 	_choice("LUN_OPT_BATT", "battery", o)
 	o = []
 	for id in LunarDesign.COMM:
 		var d: Dictionary = LunarDesign.COMM[id]
-		o.append([id, d["name"], "%.1f %s | %d %s | %s | $%d" % [float(d["mbps"]), tr("UNIT_MBPS"), int(d["power"]), tr("UNIT_W"), Units.kg(float(d["mass"])), int(d["cost"])]])
+		o.append([id, d["name"], "%.1f %s | %d %s | %s | %s" % [float(d["mbps"]), tr("UNIT_MBPS"), int(d["power"]), tr("UNIT_W"), Units.kg(float(d["mass"])), Units.money(int(d["cost"]))]])
 	_choice("LUN_OPT_COMM", "comm", o)
 
 
@@ -210,5 +210,5 @@ func _refresh() -> void:
 		var l: int = lvl.get(key, 0)
 		UIKit.set_bar_color(_bars[key], _color(l))
 		(_stat[key] as Label).add_theme_color_override("font_color", _color(l))
-	(_stat["cost"] as Label).text = "$%d / $%d" % [int(s["cost"]), LunarDesign.BUDGET]
+	(_stat["cost"] as Label).text = "%s / %s" % [Units.money(int(s["cost"])), Units.money(LunarDesign.BUDGET)]
 	(_stat["cost"] as Label).add_theme_color_override("font_color", UIKit.C_BAD if int(s["cost"]) > LunarDesign.BUDGET else UIKit.C_WARN)

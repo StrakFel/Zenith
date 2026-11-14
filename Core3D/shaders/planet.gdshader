@@ -1,4 +1,4 @@
-﻿shader_type spatial;
+shader_type spatial;
 render_mode cull_back, fog_disabled;
 #include "res://Core3D/shaders/noise.gdshaderinc"
 
@@ -20,9 +20,20 @@ void fragment() {
 	float land = smoothstep(0.54, 0.575, cont);
 	float lat = abs(p.z);
 	float dry = smoothstep(0.58, 0.86, fbm(p * 5.5 + vec3(3.0)));
-	vec3 land_col = mix(vec3(0.08, 0.27, 0.10), vec3(0.42, 0.38, 0.24), dry);
+	float elev = smoothstep(0.575, 0.78, cont);
+	vec3 forest = vec3(0.045, 0.20, 0.075);
+	vec3 savanna = vec3(0.33, 0.32, 0.15);
+	vec3 desert = vec3(0.64, 0.50, 0.30);
+	vec3 rock = vec3(0.34, 0.31, 0.29);
+	vec3 land_col = mix(forest, savanna, smoothstep(0.30, 0.62, dry));
+	land_col = mix(land_col, desert, smoothstep(0.62, 0.92, dry) * (1.0 - smoothstep(0.55, 0.9, lat)));
+	land_col = mix(land_col, rock, elev * 0.75);
+	land_col *= 0.82 + 0.36 * fbm(p * 34.0);                    // relief / texture variation
 	land_col = mix(land_col, vec3(0.92, 0.94, 0.97), smoothstep(0.80, 0.93, lat + 0.06 * fbm(p * 20.0)));
+	// deep ocean -> coastal shallows (turquoise) near the shore
 	vec3 ocean = mix(vec3(0.03, 0.22, 0.42), vec3(0.008, 0.05, 0.18), smoothstep(0.28, 0.52, cont));
+	float shore = smoothstep(0.47, 0.545, cont) * (1.0 - land);
+	ocean = mix(ocean, vec3(0.06, 0.45, 0.52), shore * 0.85);
 	vec3 alb = mix(ocean, land_col, land);
 	// fine detail that only matters when flying low
 	float d1 = fbm(p * 900.0);

@@ -54,7 +54,7 @@ static func requirements(d: Dictionary) -> Array:
 	out.append({"id": "fragile", "key": "ISSREQ_FRAGILE", "level": gl, "value": "x%.1f" % float(s["fragile"]),
 		"hint": "ISSREQH_FRAGILE"})
 	out.append({"id": "budget", "key": "REQ_BUDGET", "level": 0 if int(s["cost"]) <= BUDGET else 2,
-		"value": "$%d / $%d" % [int(s["cost"]), BUDGET], "hint": "REQH_BUDGET"})
+		"value": "%s / %s" % [Units.money(int(s["cost"])), Units.money(BUDGET)], "hint": "REQH_BUDGET"})
 	return out
 
 

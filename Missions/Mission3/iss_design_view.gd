@@ -55,18 +55,18 @@ func _build_options() -> void:
 	var o: Array = []
 	for id in IssDesign.EXPERIMENTS:
 		var d: Dictionary = IssDesign.EXPERIMENTS[id]
-		o.append([id, d["name"], "%s | x%.1f %s | x%.1f %s | $%d" % [Units.kg(float(d["mass"])), float(d["sci"]), tr("LUN_F_SCI"),
-			float(d["fragile"]), tr("ISS_ST_FRAG"), int(d["cost"])]])
+		o.append([id, d["name"], "%s | x%.1f %s | x%.1f %s | %s" % [Units.kg(float(d["mass"])), float(d["sci"]), tr("LUN_F_SCI"),
+			float(d["fragile"]), tr("ISS_ST_FRAG"), Units.money(int(d["cost"]))]])
 	_choice("ISS_OPT_EXP", "experiment", o)
 	o = []
 	for id in IssDesign.LAUNCHERS:
 		var d: Dictionary = IssDesign.LAUNCHERS[id]
-		o.append([id, d["name"], "%s | $%d" % [Units.kg(float(d["cap"])), int(d["cost"])]])
+		o.append([id, d["name"], "%s | %s" % [Units.kg(float(d["cap"])), Units.money(int(d["cost"]))]])
 	_choice("LUN_OPT_LAUNCHER", "launcher", o)
 	o = []
 	for id in IssDesign.RCS:
 		var d: Dictionary = IssDesign.RCS[id]
-		o.append([id, d["name"], "%s | %d%% | $%d" % [Units.kg(float(d["mass"])), int(float(d["fuel"]) * 100.0), int(d["cost"])]])
+		o.append([id, d["name"], "%s | %d%% | %s" % [Units.kg(float(d["mass"])), int(float(d["fuel"]) * 100.0), Units.money(int(d["cost"]))]])
 	_choice("ISS_OPT_RCS", "rcs", o)
 
 
@@ -89,5 +89,5 @@ func _refresh() -> void:
 	(_vals["mass"] as Label).add_theme_color_override("font_color", UIKit.C_BAD if float(s["mass"]) > float(s["cap"]) else Color.WHITE)
 	(_vals["fuel"] as Label).text = "%d%%" % int(float(s["fuel"]) * 100.0)
 	(_vals["frag"] as Label).text = "x%.1f" % float(s["fragile"])
-	(_vals["cost"] as Label).text = "$%d / $%d" % [int(s["cost"]), IssDesign.BUDGET]
+	(_vals["cost"] as Label).text = "%s / %s" % [Units.money(int(s["cost"])), Units.money(IssDesign.BUDGET)]
 	(_vals["cost"] as Label).add_theme_color_override("font_color", UIKit.C_BAD if int(s["cost"]) > IssDesign.BUDGET else UIKit.C_WARN)

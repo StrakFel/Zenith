@@ -166,24 +166,24 @@ func _rebuild_sat() -> void:
 	var opts: Array = []
 	for iid in goal["instruments"]:
 		var i: Dictionary = M1Design.INSTRUMENTS[iid]
-		opts.append([iid, i["name"], "%s | %d %s | %.1f %s | $%d" % [Units.kg(float(i["mass"])), int(i["power"]), tr("UNIT_W"),
-			float(i["data"]), tr("UNIT_MBPS"), int(i["cost"])]])
+		opts.append([iid, i["name"], "%s | %d %s | %.1f %s | %s" % [Units.kg(float(i["mass"])), int(i["power"]), tr("UNIT_W"),
+			float(i["data"]), tr("UNIT_MBPS"), Units.money(int(i["cost"]))]])
 	_choice("M1D_INSTRUMENT", "instrument", opts)
 	var so: Array = []
 	for sid in M1Design.SOLAR:
 		var s: Dictionary = M1Design.SOLAR[sid]
-		so.append([sid, s["name"], "%d %s | %s | $%d" % [int(s["watts"]), tr("UNIT_W"), Units.kg(float(s["mass"])), int(s["cost"])]])
+		so.append([sid, s["name"], "%d %s | %s | %s" % [int(s["watts"]), tr("UNIT_W"), Units.kg(float(s["mass"])), Units.money(int(s["cost"]))]])
 	_choice("M1D_SOLAR", "solar", so)
 	var bo: Array = []
 	for bid in M1Design.BATTERY:
 		var b: Dictionary = M1Design.BATTERY[bid]
-		bo.append([bid, b["name"], "%d %s | %s | $%d" % [int(b["wh"]), tr("UNIT_WH"), Units.kg(float(b["mass"])), int(b["cost"])]])
+		bo.append([bid, b["name"], "%d %s | %s | %s" % [int(b["wh"]), tr("UNIT_WH"), Units.kg(float(b["mass"])), Units.money(int(b["cost"]))]])
 	_choice("M1D_BATTERY", "battery", bo)
 	var co: Array = []
 	for cid in M1Design.COMM:
 		var c: Dictionary = M1Design.COMM[cid]
-		co.append([cid, c["name"], "%.1f %s | %d %s | %s | $%d" % [float(c["mbps"]), tr("UNIT_MBPS"), int(c["power"]), tr("UNIT_W"),
-			Units.kg(float(c["mass"])), int(c["cost"])]])
+		co.append([cid, c["name"], "%.1f %s | %d %s | %s | %s" % [float(c["mbps"]), tr("UNIT_MBPS"), int(c["power"]), tr("UNIT_W"),
+			Units.kg(float(c["mass"])), Units.money(int(c["cost"]))]])
 	_choice("M1D_COMM", "comm", co)
 
 
@@ -228,4 +228,4 @@ func _refresh() -> void:
 	(_bars["data"] as ProgressBar).value = minf(float(s["data_ratio"]), 1.0) * 100.0
 	UIKit.set_bar_color(_bars["data"], _color(int(lvl["data"])))
 	(_stat["data"] as Label).add_theme_color_override("font_color", _color(int(lvl["data"])))
-	(_stat["cost"] as Label).text = "$%d / $%d" % [int(s["cost"]), M1Design.BUDGET]
+	(_stat["cost"] as Label).text = "%s / %s" % [Units.money(int(s["cost"])), Units.money(M1Design.BUDGET)]

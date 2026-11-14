@@ -570,7 +570,7 @@ func _on_crashed() -> void:
 		["R_LAND_SPEED", Units.ms(absf(lm.touch_speed.y), 1)],
 		["R_LAND_OFFSET", Units.m(absf(lm.pos.x))],
 		["R_PROP_LEFT", "%d%%" % int(lm.fuel_fraction(maxf(start_fuel, 1.0)) * 100.0)],
-		["R_BUDGET_USED", "$%d / $%d" % [int(st["cost"]), LunarDesign.BUDGET]],
+		["R_BUDGET_USED", "%s / %s" % [Units.money(int(st["cost"])), Units.money(LunarDesign.BUDGET)]],
 	]
 	var tips: Array = ["TIP_LUN_LAND"]
 	if reason == "LUN_FAIL_FUEL":
@@ -803,7 +803,7 @@ func _finish_mission() -> void:
 		["R_SAMPLES", "%d / 3" % r_samples],
 		["R_ROVER_BATT", "%d%%" % int(r_energy / cap_e * 100.0)],
 		["R_UPLINK", "%d / %d %s" % [int(delivered), int(_data_mbit), tr("UNIT_MBIT")]],
-		["R_BUDGET_USED", "$%d / $%d" % [cost, LunarDesign.BUDGET]],
+		["R_BUDGET_USED", "%s / %s" % [Units.money(cost), Units.money(LunarDesign.BUDGET)]],
 		["R_SCORE", str(score)],
 	])
 	var tips: Array = []

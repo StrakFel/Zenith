@@ -154,7 +154,7 @@ static func requirements(d: Dictionary) -> Array:
 	out.append({"id": "synergy", "key": "LUNREQ_SYNERGY", "level": syn,
 		"value": "x%.1f" % float(s["bonus"]), "hint": "LUNREQH_SYNERGY"})
 	var bl := LVL_OK if int(s["cost"]) <= BUDGET else LVL_FAIL
-	out.append({"id": "budget", "key": "REQ_BUDGET", "level": bl, "value": "$%d / $%d" % [int(s["cost"]), BUDGET],
+	out.append({"id": "budget", "key": "REQ_BUDGET", "level": bl, "value": "%s / %s" % [Units.money(int(s["cost"])), Units.money(BUDGET)],
 		"hint": "REQH_BUDGET"})
 	return out
 

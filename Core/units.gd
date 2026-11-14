@@ -1,4 +1,4 @@
-﻿class_name Units
+class_name Units
 extends RefCounted
 ## Localised unit formatting (kg -> кг, m/s -> м/с ...). Uses TranslationServer so it
 ## also works from RefCounted/static code.
@@ -6,6 +6,11 @@ extends RefCounted
 
 static func _t(key: String) -> String:
 	return TranslationServer.translate(key)
+
+
+## Budget points are shown as notional millions of dollars (1 point = $5 M).
+static func money(points: float) -> String:
+	return "$%d %s" % [int(round(points * 5.0)), _t("UNIT_MUSD")]
 
 
 static func kg(v: float) -> String:

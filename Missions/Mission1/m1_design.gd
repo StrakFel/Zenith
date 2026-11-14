@@ -115,7 +115,7 @@ static func requirements(d: Dictionary, rocket: Dictionary) -> Array:
 		var total := int(rocket["cost"])
 		var lvl_b := LVL_OK if total <= BUDGET else LVL_FAIL
 		out.append({"id": "budget", "key": "REQ_BUDGET", "level": lvl_b,
-			"value": "$%d / $%d" % [total, BUDGET], "hint": "REQH_BUDGET"})
+			"value": "%s / %s" % [Units.money(total), Units.money(BUDGET)], "hint": "REQH_BUDGET"})
 		var launch_lvl := LVL_OK
 		if not bool(rocket["complete"]) or float(rocket["twr"]) < 1.05:
 			launch_lvl = LVL_FAIL

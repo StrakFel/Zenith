@@ -1,4 +1,4 @@
-﻿class_name StringsM1
+class_name StringsM1
 extends RefCounted
 
 const DATA: Dictionary = {
@@ -57,7 +57,7 @@ const DATA: Dictionary = {
 	"M1_CTRL_PITCH": ["Pitch left / right (tilt east)", "Нахил ліворуч / праворуч (на схід)"],
 	"M1_CTRL_ASSIST": ["Toggle prograde hold", "Утримання курсу за швидкістю"],
 	"M1_CTRL_FULLCUT": ["Full throttle / engine cut", "Повна тяга / вимкнути двигун"],
-	"M1_CTRL_WARP": ["Time warp (more in space)", "Прискорення часу (більше в космосі)"],
+	"M1_CTRL_WARP": ["Time: 1/2 manual speed, 3 = auto compression (default)", "Час: 1/2 вручну, 3 = авто-прискорення (за замовчуванням)"],
 	"M1_CTRL_DEPLOY": ["Deploy the satellite", "Розгорнути супутник"],
 	"M1_CTRL_PAUSE": ["Pause", "Пауза"],
 	# --- HUD

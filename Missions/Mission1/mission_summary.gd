@@ -57,7 +57,7 @@ func setup(design: Dictionary, sat: Dictionary, rk: Dictionary, rocket: Dictiona
 		["SUM_ANT", tr(str(com["name"]))],
 		["REQ_DATA", "%d / %d Mbit" % [int(sat["data_downlink"]), int(sat["data_produced"])]],
 		["REQ_ORBIT", "%d-%d km" % [int(goal["best"][0]), int(goal["best"][1])]],
-		["R_COST", "$%d / $%d" % [int(rocket["cost"]), M1Parts.BUDGET]],
+		["R_COST", "%s / %s" % [Units.money(int(rocket["cost"])), Units.money(M1Parts.BUDGET)]],
 	]))
 	body.add_child(HSeparator.new())
 	body.add_child(UIKit.label("SUM_PREDICT", 16, UIKit.C_ACCENT))

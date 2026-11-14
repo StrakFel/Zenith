@@ -228,6 +228,11 @@ const DATA: Dictionary = {
 		"Порада: клітини крихкі. Швидкість зближення при контакті має бути менше 0,1 м/с."],
 	"ISS_TIP_RCS": ["Tip: the small propellant load left almost nothing. Save gas with SHIFT (fine thrust).",
 		"Порада: малий запас палива майже вичерпано. Заощаджуйте газ клавішею SHIFT (точна тяга)."],
+	"M1_MS_TOWER": ["TOWER CLEAR", "ВЕЖУ ПРОЙДЕНО"],
+	"M1_MS_SKY": ["SUPERSONIC - MAX-Q AHEAD", "НАДЗВУК - ПОПЕРЕДУ MAX-Q"],
+	"M1_MS_THIN": ["THIN ATMOSPHERE", "РОЗРІДЖЕНА АТМОСФЕРА"],
+	"M1_MS_SPACE": ["SPACE - 100 km", "КОСМОС - 100 км"],
+	"UNIT_MUSD": ["M", "млн"],
 	"SET_SENS": ["Control sensitivity", "Чутливість керування"],
 	# --- Mission 1 additions: reliability + mission summary
 	"M1_ST_REL": ["Reliability", "Надійність"],

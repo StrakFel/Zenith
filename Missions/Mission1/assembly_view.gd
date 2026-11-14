@@ -1,4 +1,4 @@
-﻿class_name AssemblyView
+class_name AssemblyView
 extends Control
 ## Rocket assembly screen: drag parts from the catalogue onto the launch stand
 ## (or press "Install"), live mass / thrust / delta-v / cost readout.
@@ -73,7 +73,7 @@ class PartCard extends PanelContainer:
 		var right := UIKit.vbox(4)
 		h.add_child(right)
 		var cost := UIKit.label("", 18, UIKit.C_WARN, HORIZONTAL_ALIGNMENT_RIGHT)
-		cost.text = "$%d" % int(p["cost"])
+		cost.text = Units.money(int(p["cost"]))
 		right.add_child(cost)
 		var b := UIKit.button("M1_INSTALL", Vector2(84, 34))
 		b.add_theme_font_size_override("font_size", 14)
@@ -237,7 +237,7 @@ func _build_left() -> Control:
 		_stat_labels[r[1]] = val2
 	var cost_row := UIKit.hbox(8)
 	cost_row.add_child(UIKit.label("M1_ST_COST", 15, UIKit.C_MUTED))
-	_stat_labels["cost"] = UIKit.label("$0 / $%d" % M1Parts.BUDGET, 16, UIKit.C_WARN, HORIZONTAL_ALIGNMENT_RIGHT)
+	_stat_labels["cost"] = UIKit.label("%s / %s" % [Units.money(0), Units.money(M1Parts.BUDGET)], 16, UIKit.C_WARN, HORIZONTAL_ALIGNMENT_RIGHT)
 	_stat_labels["cost"].size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	cost_row.add_child(_stat_labels["cost"])
 	v.add_child(cost_row)
@@ -332,7 +332,7 @@ func _refresh() -> void:
 	var dv_l: Label = _stat_labels["dv"]
 	dv_l.text = Units.ms(dv) if bool(st["complete"]) else "-"
 	dv_l.add_theme_color_override("font_color", UIKit.C_GOOD if dv >= M1Parts.REQUIRED_DV else UIKit.C_BAD)
-	(_stat_labels["cost"] as Label).text = "$%d / $%d" % [int(st["cost"]), M1Parts.BUDGET]
+	(_stat_labels["cost"] as Label).text = "%s / %s" % [Units.money(int(st["cost"])), Units.money(M1Parts.BUDGET)]
 	(_stat_labels["cost"] as Label).add_theme_color_override("font_color", UIKit.C_BAD if bool(st["over_budget"]) else UIKit.C_WARN)
 	_cost_bar.value = float(st["cost"]) / float(M1Parts.BUDGET) * 100.0
 	UIKit.set_bar_color(_cost_bar, UIKit.C_BAD if bool(st["over_budget"]) else UIKit.C_WARN)

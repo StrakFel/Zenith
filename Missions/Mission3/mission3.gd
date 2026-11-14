@@ -420,7 +420,7 @@ func _end(success: bool, reason: String, stars: int = 0, tip: Vector2 = Vector2.
 		stats.append(["R_SCORE", str(score)])
 		var fuel_r := _fuel_r()
 		var sci := clampf(via * float(st.get("sci", 1.0)), 0.0, 1.3)
-		stats.append(["R_BUDGET_USED", "$%d / $%d" % [int(st.get("cost", 0)), IssDesign.BUDGET]])
+		stats.append(["R_BUDGET_USED", "%s / %s" % [Units.money(int(st.get("cost", 0))), Units.money(IssDesign.BUDGET)]])
 		var launch_r := clampf(1.0 - maxf(float(st.get("mass", 0.0)) / maxf(float(st.get("cap", 1.0)), 1.0) - 0.75, 0.0) * 1.6, 0.4, 1.0)
 		var tips: Array = []
 		if world.contact_speed > 0.15:

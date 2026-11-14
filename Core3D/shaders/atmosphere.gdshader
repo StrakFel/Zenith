@@ -1,4 +1,4 @@
-﻿shader_type spatial;
+shader_type spatial;
 render_mode unshaded, blend_add, cull_back, depth_draw_never, fog_disabled;
 
 uniform vec3 sun_dir = vec3(-0.55, 0.3, 0.78);
@@ -11,6 +11,7 @@ void fragment() {
 	float rim = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 2.6);
 	float lit = smoothstep(-0.35, 0.45, sl);
 	vec3 warm = mix(atm_col, vec3(1.0, 0.55, 0.25), smoothstep(0.35, -0.05, sl) * smoothstep(-0.4, 0.0, sl));
-	ALBEDO = warm * rim * lit * strength;
+	float thin = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 7.0);   // crisp bright limb line
+	ALBEDO = warm * rim * lit * strength + mix(vec3(0.65, 0.82, 1.0), warm, 0.35) * thin * lit * 1.3;
 }
 
