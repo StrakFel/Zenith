@@ -9,7 +9,7 @@ extends RefCounted
 ## eclipse length, no orbit decay or radiation model, linear degradation of science value
 ## outside the best altitude window. The numbers are game-balanced, not mission-grade (GMAT).
 
-const BUDGET := 170
+const BUDGET := 200
 const BUS_MASS := 480.0
 const BUS_POWER := 40.0
 const BUS_COST := 20
@@ -20,20 +20,20 @@ const ORBITS_IN_MISSION := 100       # science campaign length (for "data return
 
 const GOALS := {
 	"earth": {"name": "M1D_GOAL_EARTH", "desc": "M1D_GOAL_EARTH_D", "instruments": ["img_s", "img_a"],
-		"best": [90, 140], "ok": [80, 300], "duty": 0.08},
+		"best": [90, 140], "ok": [80, 300], "duty": 0.05, "ap_target": 135000.0},
 	"space": {"name": "M1D_GOAL_SPACE", "desc": "M1D_GOAL_SPACE_D", "instruments": ["mag_s", "mag_a"],
-		"best": [150, 400], "ok": [90, 700], "duty": 0.08},
+		"best": [150, 400], "ok": [90, 700], "duty": 0.09, "ap_target": 300000.0},
 	"atmo": {"name": "M1D_GOAL_ATMO", "desc": "M1D_GOAL_ATMO_D", "instruments": ["spec_s", "spec_a"],
-		"best": [85, 125], "ok": [80, 250], "duty": 0.08},
+		"best": [85, 125], "ok": [80, 250], "duty": 0.08, "ap_target": 120000.0},
 }
 ## mass kg, power W, data Mbps, cost $, sci = science multiplier, node = model node in satellite.glb
 const INSTRUMENTS := {
-	"img_s": {"name": "M1I_IMG_S", "mass": 180.0, "power": 110.0, "data": 6.0, "cost": 18, "sci": 1.0, "node": "inst_imager"},
-	"img_a": {"name": "M1I_IMG_A", "mass": 260.0, "power": 170.0, "data": 12.0, "cost": 32, "sci": 1.5, "node": "inst_imager"},
-	"mag_s": {"name": "M1I_MAG_S", "mass": 70.0, "power": 45.0, "data": 0.8, "cost": 10, "sci": 1.0, "node": "inst_mag"},
-	"mag_a": {"name": "M1I_MAG_A", "mass": 120.0, "power": 80.0, "data": 1.5, "cost": 20, "sci": 1.5, "node": "inst_mag"},
-	"spec_s": {"name": "M1I_SPEC_S", "mass": 120.0, "power": 80.0, "data": 2.5, "cost": 16, "sci": 1.0, "node": "inst_spec"},
-	"spec_a": {"name": "M1I_SPEC_A", "mass": 190.0, "power": 130.0, "data": 5.0, "cost": 28, "sci": 1.5, "node": "inst_spec"},
+	"img_s": {"name": "M1I_IMG_S", "mass": 180.0, "power": 110.0, "data": 6.0, "cost": 18, "sci": 0.66, "node": "inst_imager"},
+	"img_a": {"name": "M1I_IMG_A", "mass": 260.0, "power": 170.0, "data": 12.0, "cost": 32, "sci": 1.0, "node": "inst_imager"},
+	"mag_s": {"name": "M1I_MAG_S", "mass": 70.0, "power": 45.0, "data": 1.3, "cost": 10, "sci": 0.66, "node": "inst_mag"},
+	"mag_a": {"name": "M1I_MAG_A", "mass": 120.0, "power": 90.0, "data": 2.6, "cost": 20, "sci": 1.0, "node": "inst_mag"},
+	"spec_s": {"name": "M1I_SPEC_S", "mass": 120.0, "power": 80.0, "data": 2.5, "cost": 16, "sci": 0.66, "node": "inst_spec"},
+	"spec_a": {"name": "M1I_SPEC_A", "mass": 190.0, "power": 130.0, "data": 5.0, "cost": 28, "sci": 1.0, "node": "inst_spec"},
 }
 const SOLAR := {
 	"s": {"name": "M1S_S", "watts": 150.0, "mass": 45.0, "cost": 6, "scale": 0.7},
@@ -50,6 +50,13 @@ const COMM := {
 	"x": {"name": "M1C_X", "mbps": 4.0, "power": 25.0, "mass": 30.0, "cost": 9, "scale": 0.9},
 	"ka": {"name": "M1C_KA", "mbps": 20.0, "power": 50.0, "mass": 65.0, "cost": 16, "scale": 1.4},
 }
+
+## Mission outcome thresholds (science return 0..1). A rocket reaching orbit is NOT enough: the satellite must work.
+const SCI_MIN := 0.50      # below this the science objective failed (launch alone does not count)
+const SCI_GOOD := 0.63     # 2 stars
+const SCI_FULL := 0.74     # 3 stars (also needs a healthy hull, a reliable rocket and a frugal budget)
+const EFF_COST := 0.92     # engineering efficiency: total cost share of the budget for 3 stars
+const REL_FULL := 0.86
 
 const LVL_OK := 0
 const LVL_WARN := 1
@@ -111,6 +118,12 @@ static func requirements(d: Dictionary, rocket: Dictionary) -> Array:
 		"value": "%d / %d Wh" % [int(s["batt_wh"]), int(s["batt_need"])], "hint": "REQH_BATT"})
 	out.append({"id": "data", "key": "REQ_DATA", "level": _level(float(s["data_ratio"]), 1.0, 0.5),
 		"value": "%d / %d Mbit" % [int(s["data_downlink"]), int(s["data_produced"])], "hint": "REQH_DATA"})
+	var best: Array = goal["best"]
+	var pred_km := (float(best[0]) + float(best[1])) * 0.5
+	var pr := science_result(d, pred_km * 1000.0, pred_km * 1000.0, 100.0)
+	var psci := float(pr["science"])
+	out.append({"id": "sci", "key": "REQ_SCI", "level": LVL_OK if psci >= SCI_GOOD else (LVL_WARN if psci >= SCI_MIN else LVL_FAIL),
+		"value": "%d%%" % int(psci * 100.0), "hint": "REQH_SCI"})
 	if not rocket.is_empty():
 		var total := int(rocket["cost"])
 		var lvl_b := LVL_OK if total <= BUDGET else LVL_FAIL
@@ -121,6 +134,13 @@ static func requirements(d: Dictionary, rocket: Dictionary) -> Array:
 			launch_lvl = LVL_FAIL
 		elif float(rocket["twr"]) < 1.2 or float(rocket["dv"]) < M1Parts.REQUIRED_DV:
 			launch_lvl = LVL_WARN
+		var dv_lvl := LVL_OK if float(rocket["dv"]) >= M1Parts.REQUIRED_DV else (LVL_WARN if float(rocket["dv"]) >= M1Parts.REQUIRED_DV * 0.92 else LVL_FAIL)
+		out.append({"id": "dv", "key": "REQ_DV", "level": dv_lvl,
+			"value": "%d / %d %s" % [int(rocket["dv"]), int(M1Parts.REQUIRED_DV), TranslationServer.translate("UNIT_MS")], "hint": "REQH_DV"})
+		var g_end := float(rocket["g_end"])
+		var g_lvl := LVL_OK if g_end <= FlightModel.G_LIMIT else (LVL_WARN if g_end <= FlightModel.G_LIMIT * 1.5 else LVL_FAIL)
+		out.append({"id": "gload", "key": "REQ_GLOAD", "level": g_lvl,
+			"value": "%.1f g (%s %.1f g)" % [g_end / 9.81, TranslationServer.translate("REQ_LIMIT"), FlightModel.G_LIMIT / 9.81], "hint": "REQH_GLOAD"})
 		var rl := LVL_OK if float(rocket["rel"]) >= 0.88 else (LVL_WARN if float(rocket["rel"]) >= 0.8 else LVL_FAIL)
 		out.append({"id": "rel", "key": "REQ_REL", "level": rl, "value": "%d%%" % int(float(rocket["rel"]) * 100.0),
 			"hint": "REQH_REL"})
@@ -146,7 +166,7 @@ static func window_score(alt_km: float, best: Array, ok: Array) -> float:
 
 
 ## Science return once the satellite is in orbit. ap/pe in metres above the surface.
-static func science_result(d: Dictionary, ap_m: float, pe_m: float) -> Dictionary:
+static func science_result(d: Dictionary, ap_m: float, pe_m: float, hull: float = 100.0) -> Dictionary:
 	var s := sat_stats(d)
 	var goal: Dictionary = GOALS[d["goal"]]
 	var mean_km := (ap_m + pe_m) * 0.5 / 1000.0
@@ -154,17 +174,18 @@ static func science_result(d: Dictionary, ap_m: float, pe_m: float) -> Dictionar
 	var power_f := clampf(float(s["power_ratio"]), 0.0, 1.0)
 	var batt_f := lerpf(0.4, 1.0, clampf(float(s["batt_ratio"]), 0.0, 1.0))
 	var data_f := clampf(float(s["data_ratio"]), 0.0, 1.0)
-	var science := float(s["sci"]) * orbit_q * power_f * batt_f * data_f
+	var hull_f := lerpf(0.5, 1.0, clampf(hull / 100.0, 0.0, 1.0))      # a damaged payload returns less science
+	var science := float(s["sci"]) * orbit_q * power_f * batt_f * data_f * hull_f
 	var gbit := float(s["data_produced"]) * float(ORBITS_IN_MISSION) * data_f / 1000.0
 	var weakest := "good"
 	var wv := 0.92
-	for pair in [["power", power_f], ["batt", batt_f], ["data", data_f], ["orbit", orbit_q]]:
+	for pair in [["power", power_f], ["batt", batt_f], ["data", data_f], ["orbit", orbit_q], ["hull", hull_f]]:
 		if float(pair[1]) < wv:
 			wv = float(pair[1])
 			weakest = str(pair[0])
 	return {
 		"orbit_q": orbit_q, "power_f": power_f, "batt_f": batt_f, "data_f": data_f,
-		"science": science, "data_gb": gbit / 8.0, "mean_km": mean_km, "weakest": weakest,
+		"science": science, "hull_f": hull_f, "data_gb": gbit / 8.0, "mean_km": mean_km, "weakest": weakest,
 		"sent_ratio": data_f,
 	}
 
@@ -176,3 +197,26 @@ static func science_tier(science: float) -> int:
 	if science >= 0.5:
 		return 1
 	return 0
+
+
+## Final judgement of a flight. flight = {orbit_ok, ap, pe, integrity}. rocket = M1Parts.compute result.
+## stars: 0 = failed (no orbit OR the science objective was not met), 1 = partial science, 2 = success, 3 = full success.
+static func evaluate(d: Dictionary, rocket: Dictionary, flight: Dictionary) -> Dictionary:
+	var hull := float(flight.get("integrity", 100.0))
+	var sr := science_result(d, float(flight["ap"]), float(flight["pe"]), hull)
+	var science := float(sr["science"])
+	var stars := 0
+	var cause := ""
+	if not bool(flight.get("orbit_ok", false)):
+		cause = "orbit"
+	elif science < SCI_MIN:
+		cause = str(sr["weakest"])
+		if cause == "good":
+			cause = "weak"
+	else:
+		stars = 1
+		if science >= SCI_GOOD:
+			stars = 2
+		if science >= SCI_FULL and hull >= 80.0 and float(rocket["cost"]) <= EFF_COST * float(BUDGET) and float(rocket["rel"]) >= REL_FULL:
+			stars = 3
+	return {"stars": stars, "science": science, "cause": cause, "sr": sr}

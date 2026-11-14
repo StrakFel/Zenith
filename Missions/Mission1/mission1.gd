@@ -283,6 +283,7 @@ func _on_launch(b: Dictionary) -> void:
 	stage_panel.separate_requested.connect(_do_separate)
 	stage_panel.fairing_requested.connect(_do_fairing)
 	cam_hint.set_compact(false)
+	cam_hint.set_hud_corner(true)
 	cam_hint.set_mission_mode(true, 118.0)
 	state = S.COUNTDOWN
 	_cd = 0.0
@@ -356,7 +357,7 @@ func _autopilot(delta: float) -> void:
 	var thr := 1.0 if model.q < 0.8 * FlightModel.Q_LIMIT else 0.55
 	if _ap_phase == 0:
 		model.pitch = 0.0 if h < 600.0 else deg_to_rad(90.0 * minf(1.0, pow((h - 600.0) / 60000.0, 0.5)))
-		if ap >= 115000.0:
+		if ap >= float(M1Design.GOALS[design.get("goal", "earth")].get("ap_target", 115000.0)):
 			_ap_phase = 1
 	if _ap_phase == 1:
 		thr = 0.0
@@ -369,6 +370,9 @@ func _autopilot(delta: float) -> void:
 	if model.in_stable_orbit():
 		thr = 0.0
 		_try_deploy()
+	var ta_full := model.max_thrust * (model.isp_vac / model.isp_sl if h > 50000.0 else 1.0) / model.mass()
+	if ta_full > FlightModel.G_LIMIT * 0.95:
+		thr = minf(thr, FlightModel.G_LIMIT * 0.95 / ta_full)      # a competent pilot throttles down near burnout
 	model.throttle = thr
 	warp = 2 if h < 30000.0 else 4
 
@@ -463,7 +467,7 @@ func _simulate(delta: float) -> void:
 	if model.stage == 2 and model.engine_on and not _ign_fx:
 		_ign_fx = true
 		flight.ignite_stage2()
-		hud.big(tr("STG_BIG_IGNITE"), UIKit.C_ACCENT)
+		hud.notify(tr("STG_TOAST_IGNITE"), UIKit.C_ACCENT)
 		Sfx.play("ignite", -4.0)
 	if model.has_upper and model.stage == 1 and model.fuel <= 0.0 and not model.in_stable_orbit():
 		_stuck_t += delta
@@ -527,6 +531,8 @@ func _update_hint() -> void:
 		hud.set_hint("M1_HINT_ORBIT", UIKit.C_GOOD)
 	elif model.q > 0.85 * FlightModel.Q_LIMIT:
 		hud.set_hint("M1_HINT_MAXQ", UIKit.C_BAD)
+	elif model.g_load > 0.9 * FlightModel.G_LIMIT:
+		hud.set_hint("M1_HINT_GLOAD", UIKit.C_WARN)
 	elif model.has_upper and model.stage == 1 and model.fuel <= 0.0:
 		hud.set_hint("STG_HINT_EMPTY", UIKit.C_BAD)
 	elif model.has_upper and model.stage == 1 and model.fuel_fraction() < 0.1:
@@ -588,7 +594,7 @@ func _do_separate() -> void:
 	flight.separate_stage()
 	Sfx.play("clang", -2.0)
 	Sfx.play("whoosh", -6.0)
-	hud.big(tr("STG_BIG_SEP"), UIKit.C_ORANGE)
+	hud.notify(tr("STG_TOAST_SEP"), UIKit.C_ORANGE)
 	_override_hint = "STG_NOW_COAST"
 	_override_t = 3.0
 	if float(r["shock"]) > 1.0:
@@ -611,7 +617,7 @@ func _do_fairing() -> void:
 		_override_t = 5.0
 		Sfx.play("hit", -8.0)
 	else:
-		hud.big(tr("STG_BIG_FAIRING"), UIKit.C_ACCENT)
+		hud.notify(tr("STG_TOAST_FAIRING"), UIKit.C_ACCENT)
 
 
 func _try_deploy() -> void:
@@ -661,18 +667,16 @@ func _succeed() -> void:
 		stage_panel.visible = false
 	var fuel_left := model.fuel_fraction()
 	var o := model.orbit()
-	var sr := M1Design.science_result(design, float(o["ap"]), float(o["pe"]))
-	var science := float(sr["science"])
-	var stars := 1
-	if science >= 0.7:
-		stars += 1
-	if science >= 0.95 and model.integrity >= 80.0:
-		stars += 1
+	var ev := M1Design.evaluate(design, stats, {"orbit_ok": true, "ap": float(o["ap"]), "pe": float(o["pe"]), "integrity": model.integrity})
+	var sr: Dictionary = ev["sr"]
+	var science := float(ev["science"])
+	var stars := int(ev["stars"])
+	var success := stars > 0
 	var stage_pen := int(maxf(model.sep_waste, 0.0) * 400.0) + int(minf(model.dead_mass_time, 20.0) * 5.0) \
 		+ (120 if fairing_late else 0) + (150 if model.fairing_early else 0)
 	var score := stars * 1000 + int(science * 1500.0) + int(fuel_left * 300.0) + int(model.integrity * 2.0) - stage_pen \
 		+ maxi(M1Parts.BUDGET - int(stats["cost"]), 0) * 4
-	hud.set_hint("M1_HINT_SUCCESS", UIKit.C_GOOD)
+	hud.set_hint("M1_HINT_SUCCESS" if success else "", UIKit.C_GOOD)
 	var goal_id := str(design["goal"])
 	var goal: Dictionary = M1Design.GOALS[goal_id]
 	var res: Array = [
@@ -707,6 +711,8 @@ func _succeed() -> void:
 			tips.append("TIP_DATA")
 		"orbit":
 			tips.append("TIP_ORBIT_LOW" if float(sr["mean_km"]) < float(goal["best"][0]) else "TIP_ORBIT_HIGH")
+		"hull":
+			tips.append("TIP_HULL")
 	if fuel_left > 0.4:
 		tips.append("TIP_FUEL")
 	if model.max_q_seen > 0.9 * FlightModel.Q_LIMIT:
@@ -723,12 +729,27 @@ func _succeed() -> void:
 		tips.append("TIP_TRY_UPPER")
 	if anomaly_seen:
 		tips.append("TIP_REL")
+	if success and stars < 3:
+		# what separates this result from a full success (the targets are shown, the way to reach them is not)
+		if science < M1Design.SCI_FULL:
+			tips.append("TIP_3_SCI")
+		if model.integrity < 80.0:
+			tips.append("TIP_3_HULL")
+		if float(stats["rel"]) < M1Design.REL_FULL:
+			tips.append("TIP_3_REL")
+		if float(stats["cost"]) > M1Design.EFF_COST * float(M1Parts.BUDGET):
+			tips.append("TIP_3_COST")
 	if tips.is_empty():
 		tips.append("TIP_GOOD")
-	var extra := {"segments": segments, "science": science, "tips": tips,
-		"user": "USER_%s_%d" % [goal_id.to_upper(), M1Design.science_tier(science)]}
+	var extra := {"segments": segments, "science": science, "tips": tips}
+	if success:
+		extra["user"] = "USER_%s_%d" % [goal_id.to_upper(), M1Design.science_tier(science)]
+		extra["science_note"] = "M1_STAR_RULES"
 	Sfx.stop_all_loops()
-	finish(true, stars, score, res, "M1_WIN_REASON", 1.0, extra)
+	if success:
+		finish(true, stars, score, res, "M1_WIN_REASON", 1.0, extra)
+	else:
+		finish(false, 0, 0, res, "M1_FAIL_SCI_" + str(ev["cause"]).to_upper(), 1.2, extra)
 
 
 func _staging_text() -> String:

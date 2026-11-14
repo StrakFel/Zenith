@@ -14,6 +14,7 @@ const ATM_TOP := 70_000.0
 const SAFE_PE := 80_000.0       # periapsis needed to call it a stable orbit
 const Q_LIMIT := 50_000.0       # Pa, structural limit (Max-Q)
 const G0 := 9.80665
+const G_LIMIT := 65.0           # m/s^2 (about 6.6 g): sustained thrust acceleration above this hurts the payload
 
 # vehicle
 var dry_mass := 0.0
@@ -61,6 +62,7 @@ var max_q_seen := 0.0
 var q := 0.0
 var accel := 0.0
 var thrust_now := 0.0
+var g_load := 0.0               # thrust acceleration, m/s^2
 
 
 func setup(stats: Dictionary) -> void:
@@ -180,6 +182,9 @@ func step(dt: float) -> void:
 		ar -= drag / m * vr / v
 		at -= drag / m * vt / v
 	var ta := thrust_now / m
+	g_load = ta
+	if ta > G_LIMIT:
+		integrity = maxf(0.0, integrity - (ta - G_LIMIT) * 0.12 * dt)
 	ar += ta * cos(pitch)
 	at += ta * sin(pitch)
 	accel = sqrt(ar * ar + at * at) if not on_pad else ta

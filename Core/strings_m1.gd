@@ -73,8 +73,8 @@ const DATA: Dictionary = {
 	"HUD_INTEGRITY": ["Hull", "Корпус"],
 	"HUD_ASSIST_ON": ["PROGRADE HOLD ON [T]", "УТРИМАННЯ КУРСУ УВІМК. [T]"],
 	"HUD_ASSIST_OFF": ["Prograde hold off [T]", "Утримання курсу вимк. [T]"],
-	"HUD_CONTROLS_HINT": ["W/S throttle  |  A/D pitch  |  T prograde hold  |  1-3 time warp  |  SPACE deploy  |  ESC pause",
-		"W/S тяга  |  A/D нахил  |  T утримання курсу  |  1-3 прискорення часу  |  ПРОБІЛ розгортання  |  ESC пауза"],
+	"HUD_CONTROLS_HINT": ["W/S throttle | A/D pitch | T prograde | G stage | F fairing | 1-3 time | SPACE deploy | C camera | ESC pause",
+		"W/S тяга | A/D нахил | T курс | G ступінь | F обтічник | 1-3 час | ПРОБІЛ розгорнути | C камера | ESC пауза"],
 	"M1_LIFTOFF": ["LIFTOFF!", "СТАРТ!"],
 	# --- hints
 	"M1_HINT_COUNTDOWN": ["Launch sequence started. All systems nominal.",

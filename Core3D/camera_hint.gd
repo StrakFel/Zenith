@@ -9,6 +9,7 @@ var _mission_mode := false
 var _top := -1.0
 var _right := false
 var _compact := false
+var _hud_corner := false
 
 
 ## top >= 0: centred at that y. top < 0: bottom corner (left, or right when `right`).
@@ -42,6 +43,21 @@ func setup(mission_mode: bool, top: float = -1.0, right: bool = false) -> void:
 
 
 func _layout() -> void:
+	if _hud_corner:
+		# flight HUD: the hint sits at the top-right under the clock, the inspect banner at the bottom-centre
+		_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+		_panel.offset_left = -246
+		_panel.offset_right = -16
+		_panel.offset_top = 118
+		_panel.offset_bottom = 118
+		_panel.grow_vertical = Control.GROW_DIRECTION_END
+		_banner.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+		_banner.offset_left = -300
+		_banner.offset_right = 300
+		_banner.offset_bottom = -64
+		_banner.offset_top = -64
+		_banner.grow_vertical = Control.GROW_DIRECTION_BEGIN
+		return
 	if _top >= 0.0:
 		_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 		_panel.offset_top = _top
@@ -70,6 +86,13 @@ func set_mission_mode(on: bool, top: float = -2.0) -> void:
 	_label.text = "CAM_HINT_MISSION" if on else "CAM_HINT_MENU"
 	if top > -1.5:
 		_top = top
+	_layout()
+
+
+## Flight-HUD placement (top-right under the clock / bottom-centre banner) - no overlap with the task panel.
+func set_hud_corner(on: bool) -> void:
+	_hud_corner = on
+	_label.custom_minimum_size.x = 214.0 if on else (320.0 if _compact else 420.0)
 	_layout()
 
 

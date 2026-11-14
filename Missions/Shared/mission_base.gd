@@ -13,6 +13,8 @@ var mission_id: String = ""
 var overlay: CanvasLayer
 var pause_menu: PauseMenu
 var ended := false
+var last_stars := -1          # result of finish() (used by automated tests)
+var last_success := false
 
 
 func _ready() -> void:
@@ -78,6 +80,8 @@ func finish(success: bool, stars: int, score: int, stats: Array, reason_key: Str
 	if ended:
 		return
 	ended = true
+	last_stars = stars
+	last_success = success
 	pause_menu.enabled = false
 	if success:
 		GameState.record_result(mission_id, stars, score)

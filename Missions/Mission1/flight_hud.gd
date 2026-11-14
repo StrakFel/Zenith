@@ -48,7 +48,9 @@ var _qbar: ProgressBar
 var _hint: Label
 var _hint_panel: PanelContainer
 var _hint_key := ""
-var _big: Label
+var _toast: Label
+var _toast_panel: PanelContainer
+var _toast_tw: Tween
 var _warp: Label
 var _clock: Label
 var _att: Attitude
@@ -105,6 +107,8 @@ func build() -> void:
 	_att = Attitude.new()
 	av.add_child(_att)
 	_assist = UIKit.label("HUD_ASSIST_OFF", 14, UIKit.C_MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	_assist.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_assist.custom_minimum_size.x = 150
 	av.add_child(_assist)
 
 	# ---- clock / warp (top-right)
@@ -121,37 +125,45 @@ func build() -> void:
 	_warp = UIKit.label("x1", 16, UIKit.C_ACCENT, HORIZONTAL_ALIGNMENT_CENTER)
 	tv.add_child(_warp)
 
-	# ---- hint (top-centre)
+	# ---- top-centre: current task (hint) with compact notifications stacked under it - never over the rocket
+	var tc := VBoxContainer.new()
+	tc.add_theme_constant_override("separation", 6)
+	tc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tc.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	tc.offset_left = -300
+	tc.offset_right = 300
+	tc.offset_top = 16
+	tc.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	add_child(tc)
 	_hint_panel = UIKit.panel()
-	_hint_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	_hint_panel.offset_top = 16
-	_hint_panel.custom_minimum_size = Vector2(620, 0)
-	_hint_panel.offset_left = -310
-	_hint_panel.offset_right = 310
+	_hint_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hint_panel.visible = false
-	add_child(_hint_panel)
-	_hint = UIKit.label("", 19, UIKit.C_TEXT, HORIZONTAL_ALIGNMENT_CENTER)
+	tc.add_child(_hint_panel)
+	_hint = UIKit.label("", 17, UIKit.C_TEXT, HORIZONTAL_ALIGNMENT_CENTER)
 	_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_hint.custom_minimum_size.x = 560
 	_hint_panel.add_child(_hint)
+	_toast_panel = PanelContainer.new()
+	_toast_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_toast_panel.add_theme_stylebox_override("panel", UIKit.box(Color(0.04, 0.09, 0.18, 0.9), UIKit.C_ACCENT, 8, 1, 8))
+	_toast_panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_toast_panel.visible = false
+	tc.add_child(_toast_panel)
+	_toast = UIKit.label("", 16, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
+	_toast.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_toast.custom_minimum_size.x = 420
+	_toast_panel.add_child(_toast)
 
-	# ---- big centre text
-	_big = UIKit.label("", 120, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
-	_big.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	_big.offset_left = -400
-	_big.offset_right = 400
-	_big.offset_top = -200
-	_big.offset_bottom = -40
-	_big.add_theme_color_override("font_outline_color", Color(0.1, 0.3, 0.7))
-	_big.add_theme_constant_override("outline_size", 6)
-	add_child(_big)
-
-	# ---- controls reminder (bottom-centre)
-	var ctl := UIKit.label("HUD_CONTROLS_HINT", 14, UIKit.C_MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	# ---- controls reminder (bottom-centre, between the gauges and the attitude panel)
+	var ctl := UIKit.label("HUD_CONTROLS_HINT", 13, UIKit.C_MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	ctl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	ctl.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	ctl.offset_left = -420
-	ctl.offset_right = 420
-	ctl.offset_top = -34
+	ctl.offset_left = -330
+	ctl.offset_right = 330
+	ctl.offset_top = -46
 	ctl.offset_bottom = -8
+	ctl.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	ctl.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	add_child(ctl)
 
 
@@ -220,12 +232,25 @@ func set_hint(key: String, color: Color = UIKit.C_TEXT) -> void:
 	create_tween().tween_property(_hint_panel, "modulate:a", 1.0, 0.3)
 
 
+## Compact game notification (top-centre, under the task hint): fades in, stays ~2 s, fades out. Replaces the old
+## giant centre text. Countdown digits are shown a bit larger but in the same place.
+func notify(text: String, color: Color = Color.WHITE) -> void:
+	_toast.text = text
+	var digits := text.length() <= 2
+	_toast.add_theme_font_size_override("font_size", 40 if digits else 16)
+	_toast.add_theme_color_override("font_color", color)
+	_toast.custom_minimum_size.x = 80 if digits else 420
+	_toast_panel.add_theme_stylebox_override("panel", UIKit.box(Color(0.04, 0.09, 0.18, 0.9), color, 8, 1, 8))
+	_toast_panel.visible = true
+	_toast_panel.modulate.a = 0.0
+	if _toast_tw != null:
+		_toast_tw.kill()
+	_toast_tw = create_tween()
+	_toast_tw.tween_property(_toast_panel, "modulate:a", 1.0, 0.3)
+	_toast_tw.tween_interval(1.0 if digits else 1.9)
+	_toast_tw.tween_property(_toast_panel, "modulate:a", 0.0, 0.5)
+	_toast_tw.tween_callback(func(): _toast_panel.visible = false)
+
+
 func big(text: String, color: Color = Color.WHITE) -> void:
-	_big.text = text
-	_big.add_theme_color_override("font_color", color)
-	_big.pivot_offset = _big.size * 0.5
-	_big.scale = Vector2(1.5, 1.5)
-	_big.modulate.a = 1.0
-	var tw := create_tween().set_parallel(true)
-	tw.tween_property(_big, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.tween_property(_big, "modulate:a", 0.0, 0.9).set_delay(0.4)
+	notify(text, color)

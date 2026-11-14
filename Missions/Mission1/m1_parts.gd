@@ -3,7 +3,7 @@ extends RefCounted
 ## Rocket parts catalogue + design maths (mass, thrust-to-weight, delta-v, cost).
 
 const G0 := 9.80665
-const BUDGET := 170
+const BUDGET := 200
 const PAYLOAD_MASS := 1000.0  # the satellite (kg)
 const REQUIRED_DV := 5200.0   # rough delta-v needed for orbit in this scaled-down world (m/s)
 
@@ -49,21 +49,26 @@ static func catalog(slot: String) -> Dictionary:
 			return ENGINES
 
 
+## Returns [[label_key, text, number, direction], ...]; direction +1 = higher is better, -1 = lower is better.
+## The number lets the catalogue show how a part compares with the one that is installed now.
 static func part_stat_lines(slot: String, id: String) -> Array:
-	## Returns [[label_key, value_text], ...] for the catalogue card.
 	var p: Dictionary = catalog(slot)[id]
+	var rel: Array = ["M1_ST_REL", "%d%%" % int(float(p["rel"]) * 100.0), float(p["rel"]) * 100.0, 1]
 	match slot:
 		"nose":
-			return [["M1_ST_MASS", Units.kg(float(p["mass"]))], ["M1_ST_DRAG", "%.2f" % float(p["cd"])], ["M1_ST_REL", "%d%%" % int(float(p["rel"]) * 100.0)]]
-		"upper":
-			return [["M1_ST_FUEL", Units.kg(float(p["fuel"]))], ["M1_ST_THRUST", Units.kn(float(p["thrust"]))],
-				["M1_ST_ISP", Units.sec(float(p["isp_vac"]))], ["M1_ST_REL", "%d%%" % int(float(p["rel"]) * 100.0)]]
+			return [["M1_ST_MASS", Units.kg(float(p["mass"])), float(p["mass"]), -1],
+				["M1_ST_DRAG", "%.2f" % float(p["cd"]), float(p["cd"]), -1], rel]
 		"tank":
-			return [["M1_ST_FUEL", Units.kg(float(p["fuel"]))], ["M1_ST_MASS", Units.kg(float(p["dry"]))], ["M1_ST_REL", "%d%%" % int(float(p["rel"]) * 100.0)]]
+			return [["M1_ST_FUEL", Units.kg(float(p["fuel"])), float(p["fuel"]), 1],
+				["M1_ST_MASS", Units.kg(float(p["dry"])), float(p["dry"]), -1], rel]
+		"upper":
+			return [["M1_ST_FUEL", Units.kg(float(p["fuel"])), float(p["fuel"]), 1],
+				["M1_ST_THRUST", Units.kn(float(p["thrust"])), float(p["thrust"]) / 1000.0, 1],
+				["M1_ST_ISP", Units.sec(float(p["isp_vac"])), float(p["isp_vac"]), 1], rel]
 		_:
-			return [["M1_ST_THRUST", Units.kn(float(p["thrust"]))],
-				["M1_ST_ISP", Units.sec(float(p["isp_vac"]))], ["M1_ST_MASS", Units.kg(float(p["mass"]))],
-				["M1_ST_REL", "%d%%" % int(float(p["rel"]) * 100.0)]]
+			return [["M1_ST_THRUST", Units.kn(float(p["thrust"])), float(p["thrust"]) / 1000.0, 1],
+				["M1_ST_ISP", Units.sec(float(p["isp_vac"])), float(p["isp_vac"]), 1],
+				["M1_ST_MASS", Units.kg(float(p["mass"])), float(p["mass"]), -1], rel]
 
 
 ## build = {"nose": id, "tank": id, "engine": id} ("" = empty).
@@ -139,6 +144,12 @@ static func compute(build: Dictionary, payload: float = PAYLOAD_MASS, extra_cost
 		var m_up_dry := m_sep - reserve
 		dv += float(out["u_isp_vac"]) * G0 * log(m_sep / maxf(m_up_dry, 1.0))
 	out["dv"] = dv
+	# acceleration of the LAST stage near burnout (m/s^2, vacuum): the pilot must throttle down above FlightModel.G_LIMIT
+	var m_end := dry - (stage1_dry if u != "" else 0.0)
+	var t_last := thrust * (isp_vac / maxf(isp_sl, 1.0))
+	if u != "":
+		t_last = float(out["u_thrust"]) * float(out["u_isp_vac"]) / float(out["u_isp_sl"])
+	out["g_end"] = t_last / maxf(m_end, 1.0)
 	out["complete"] = n != "" and t != "" and e != ""
 	return out
 

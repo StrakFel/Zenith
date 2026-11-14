@@ -45,7 +45,7 @@ class PartCard extends PanelContainer:
 	var slot := ""
 	var id := ""
 
-	func setup(s: String, i: String, installed: bool) -> void:
+	func setup(s: String, i: String, installed: bool, current: String = "") -> void:
 		slot = s
 		id = i
 		var p: Dictionary = M1Parts.catalog(slot)[id]
@@ -66,21 +66,41 @@ class PartCard extends PanelContainer:
 		d.custom_minimum_size.x = 150
 		v.add_child(d)
 		var stats := UIKit.hbox(12)
+		var cur_lines: Array = M1Parts.part_stat_lines(slot, current) if (current != "" and current != id) else []
+		var li := 0
 		for line in M1Parts.part_stat_lines(slot, id):
 			var col := UIKit.vbox(0)
 			col.add_child(UIKit.label(str(line[0]), 11, UIKit.C_MUTED))
-			col.add_child(UIKit.label(str(line[1]), 14, UIKit.C_TEXT))
+			var vrow := UIKit.hbox(4)
+			vrow.add_child(UIKit.label(str(line[1]), 14, UIKit.C_TEXT))
+			if not cur_lines.is_empty():
+				# comparison with the part installed now: green = better, red = worse
+				var diff: float = float(line[2]) - float(cur_lines[li][2])
+				if absf(diff) > 0.0001:
+					var better: bool = diff * float(line[3]) > 0.0
+					vrow.add_child(UIKit.label("%s%s" % ["+" if diff > 0.0 else "-", _fmt_delta(absf(diff))], 11,
+						UIKit.C_GOOD if better else UIKit.C_BAD))
+			col.add_child(vrow)
 			stats.add_child(col)
+			li += 1
 		v.add_child(stats)
 		var right := UIKit.vbox(4)
 		h.add_child(right)
 		var cost := UIKit.label("", 18, UIKit.C_WARN, HORIZONTAL_ALIGNMENT_RIGHT)
 		cost.text = Units.money(int(p["cost"]))
 		right.add_child(cost)
+		if current != "" and current != id:
+			var dc: int = int(p["cost"]) - int(M1Parts.catalog(slot)[current]["cost"])
+			if dc != 0:
+				right.add_child(UIKit.label("%s%s" % ["+" if dc > 0 else "-", Units.money(absi(dc))], 12,
+					UIKit.C_BAD if dc > 0 else UIKit.C_GOOD, HORIZONTAL_ALIGNMENT_RIGHT))
 		var b := UIKit.button("M1_INSTALL", Vector2(84, 34))
 		b.add_theme_font_size_override("font_size", 14)
 		b.pressed.connect(func(): install.emit(slot, id))
 		right.add_child(b)
+
+	static func _fmt_delta(v: float) -> String:
+		return "%d" % int(round(v)) if v >= 10.0 else "%.2f" % v
 
 	func _get_drag_data(_at: Vector2) -> Variant:
 		var prev := PartIcon.new(slot, id, Vector2(86, 110))
@@ -307,7 +327,7 @@ func _show_tab(slot: String) -> void:
 		var card := PartCard.new()
 		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_cards_box.add_child(card)
-		card.setup(slot, id, str(build[slot]) == id)
+		card.setup(slot, id, str(build[slot]) == id, str(build[slot]))
 		card.install.connect(_on_install)
 
 
