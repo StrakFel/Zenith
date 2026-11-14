@@ -64,9 +64,34 @@ func record_result(id: String, stars: int, score: int) -> void:
 		"completed": true,
 		"stars": maxi(stars, int(old.get("stars", 0))),
 		"score": maxi(score, int(old.get("score", 0))),
+		"best_prox": int(old.get("best_prox", 0)),
 	}
 	save_game()
 	progress_changed.emit()
+
+
+## Personal best of "Mission Success Proximity" (0-100 %), kept between sessions. A failed attempt may set it too,
+## without marking the mission as completed.
+func get_best_prox(id: String) -> int:
+	if progress.has(id):
+		return int((progress[id] as Dictionary).get("best_prox", 0))
+	return 0
+
+
+func get_best_score(id: String) -> int:
+	if progress.has(id):
+		return int((progress[id] as Dictionary).get("score", 0))
+	return 0
+
+
+func record_proximity(id: String, percent: int) -> void:
+	var old: Dictionary = progress.get(id, {})
+	if old.is_empty():
+		progress[id] = {"completed": false, "stars": 0, "score": 0, "best_prox": percent}
+	else:
+		old["best_prox"] = maxi(percent, int(old.get("best_prox", 0)))
+		progress[id] = old
+	save_game()
 
 
 func reset_progress() -> void:
@@ -110,4 +135,5 @@ func load_game() -> void:
 				"completed": bool(e.get("completed", false)),
 				"stars": int(e.get("stars", 0)),
 				"score": int(e.get("score", 0)),
+				"best_prox": int(e.get("best_prox", 0)),
 			}

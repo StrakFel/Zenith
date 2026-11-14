@@ -53,6 +53,7 @@ const MILESTONES := [[600.0, "M1_MS_TOWER"], [12000.0, "M1_MS_SKY"], [45000.0, "
 var _anom_at := -1.0
 var _anom_end := -1.0
 var anomaly_seen := false
+var last_prox: Dictionary = {}   # Mission Success Proximity of the finished flight (read by tests)
 var _ap_phase := 0
 
 
@@ -742,6 +743,9 @@ func _succeed() -> void:
 	if tips.is_empty():
 		tips.append("TIP_GOOD")
 	var extra := {"segments": segments, "science": science, "tips": tips}
+	var prox := _proximity_extra(true, success, stars, score)
+	if not prox.is_empty():
+		extra["proximity"] = prox
 	if success:
 		extra["user"] = "USER_%s_%d" % [goal_id.to_upper(), M1Design.science_tier(science)]
 		extra["science_note"] = "M1_STAR_RULES"
@@ -750,6 +754,26 @@ func _succeed() -> void:
 		finish(true, stars, score, res, "M1_WIN_REASON", 1.0, extra)
 	else:
 		finish(false, 0, 0, res, "M1_FAIL_SCI_" + str(ev["cause"]).to_upper(), 1.2, extra)
+
+
+## Builds the "proximity" block for the result screen from the REAL flight state and stores the personal best.
+func _proximity_extra(orbit_ok: bool, success: bool, stars: int, score: int) -> Dictionary:
+	if design.is_empty() or stats.is_empty():
+		return {}
+	var o := model.orbit()
+	var flight := {"orbit_ok": orbit_ok, "ap": minf(float(o["ap"]), 1.0e9), "pe": float(o["pe"]), "integrity": model.integrity,
+		"max_alt": _max_alt}
+	var prox := M1Design.proximity(design, stats, flight)
+	var prev_best := GameState.get_best_prox(mission_id)
+	var prev_score := GameState.get_best_score(mission_id)
+	var prev_stars := GameState.get_stars(mission_id)
+	GameState.record_proximity(mission_id, int(prox["percent"]))
+	prox["best"] = maxi(prev_best, int(prox["percent"]))
+	prox["new_best"] = int(prox["percent"]) > prev_best and int(prox["percent"]) > 0
+	prox["best_stars"] = maxi(prev_stars, stars)
+	prox["best_score"] = maxi(prev_score, score)
+	last_prox = prox
+	return prox
 
 
 func _staging_text() -> String:
@@ -784,4 +808,8 @@ func _fail(reason_key: String, boom: bool) -> void:
 		["R_MAXQ", Units.kpa(model.max_q_seen)],
 		["R_TIME", "%d:%02d" % [int(model.time) / 60, int(model.time) % 60]],
 	]
-	finish(false, 0, 0, res, reason_key, 1.8)
+	var fail_extra := {}
+	var fprox := _proximity_extra(false, false, 0, 0)
+	if not fprox.is_empty():
+		fail_extra["proximity"] = fprox
+	finish(false, 0, 0, res, reason_key, 1.8, fail_extra)

@@ -9,11 +9,14 @@ var _f := 0
 var _started := false
 var _results: Array = []
 var _timescale := 10.0
+var _shot_dir := ""
+var _shot_wait := -1
 
 func _initialize() -> void:
 	var a := OS.get_cmdline_user_args()
 	var per := int(a[1]) if a.size() > 1 else 2
 	_timescale = float(a[2]) if a.size() > 2 else 10.0
+	_shot_dir = a[3] if a.size() > 3 else ""
 	var fa := FileAccess.open(a[0], FileAccess.READ)
 	var head := fa.get_csv_line()
 	while not fa.eof_reached():
@@ -41,8 +44,15 @@ func _initialize() -> void:
 			continue
 		seen[key] = int(seen.get(key, 0)) + 1
 		want[st].append(r)
-	for st in [3, 2, 1, 0]:
+	var classes: Array = [3, 2, 1, 0]
+	if a.size() > 4:
+		classes = []
+		for c in a[4].split(","):
+			classes.append(int(c))
+	for st in classes:
 		for r in want[st]:
+			if _shot_dir != "" and want[st].find(r) > 0:
+				continue
 			_queue.append(r)
 	Engine.time_scale = _timescale
 	_next()
@@ -88,10 +98,28 @@ func _process(_d: float) -> bool:
 		m.dev_autopilot = true
 		m.flight.skip_intro()
 		return false
+	if m.ended and m.last_stars >= 0 and _shot_dir != "":
+		# visual mode: let the result screen animate, save a screenshot, then continue
+		if _shot_wait < 0:
+			_shot_wait = 150
+		_shot_wait -= 1
+		if _shot_wait == 0:
+			var img := root.get_viewport().get_texture().get_image()
+			img.save_png("%s/result_%s_%s.png" % [_shot_dir, _cur["stars"], _cur["goal"]])
+		if _shot_wait > 0:
+			return false
+		_shot_wait = -1
 	if m.ended and m.last_stars >= 0:
 		_results.append({"expect": int(_cur["stars"]), "got": m.last_stars})
-		print("expect %s star(s), game awarded %d | %s/%s/%s/%s | %s %s %s%s%s | cost %s science(csv) %s" % [_cur["stars"], m.last_stars,
-			_cur["nose"], _cur["tank"], _cur["engine"], _cur["upper"], _cur["goal"], _cur["instrument"], _cur["solar"], _cur["battery"], _cur["comm"], _cur["cost"], _cur["science"]])
+		var px: Dictionary = m.last_prox
+		var okn := 0
+		if not px.is_empty():
+			for r in px["reqs"]:
+				if bool(r["ok"]):
+					okn += 1
+		print("expect %s star(s), game awarded %d | PROXIMITY %d%% reqs_ok=%d/7 best=%d | %s/%s/%s/%s | %s %s %s%s%s | cost %s" % [_cur["stars"], m.last_stars,
+			int(px.get("percent", -1)), okn, int(px.get("best", -1)),
+			_cur["nose"], _cur["tank"], _cur["engine"], _cur["upper"], _cur["goal"], _cur["instrument"], _cur["solar"], _cur["battery"], _cur["comm"], _cur["cost"]])
 		_cur = {}
 		_next()
 	elif _f > 60000:

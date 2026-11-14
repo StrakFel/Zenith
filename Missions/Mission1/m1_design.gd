@@ -220,3 +220,106 @@ static func evaluate(d: Dictionary, rocket: Dictionary, flight: Dictionary) -> D
 		if science >= SCI_FULL and hull >= 80.0 and float(rocket["cost"]) <= EFF_COST * float(BUDGET) and float(rocket["rel"]) >= REL_FULL:
 			stars = 3
 	return {"stars": stars, "science": science, "cause": cause, "sr": sr}
+
+
+## MISSION SUCCESS PROXIMITY (0-100 %): how close the flight came to meeting EVERY mandatory requirement. It is NOT the
+## scientific result (science return) and NOT campaign progress. Each requirement is scored continuously from the real
+## flight outcome (a small miss keeps most of the points, a big miss loses them); passing them all gives exactly 100 %.
+## flight = {orbit_ok, ap, pe, integrity, max_alt (m)}.  Returns {percent, reqs[], recs[], critical_failed, all_ok}.
+const PROX_WEIGHTS := {"orbit": 20.0, "window": 10.0, "hull": 10.0, "power": 12.0, "batt": 8.0, "data": 15.0, "science": 25.0}
+const PROX_HULL_MIN := 60.0
+const PROX_RATIO_MIN := 0.75      # power / data link must cover at least this share of the demand
+const PROX_BATT_MIN := 0.60       # battery capacity vs the eclipse need
+const PROX_WINDOW_MIN := 0.75     # orbit-window quality (1 = inside the best altitude range)
+const PROX_CRITICAL_CAP := 89      # a failed critical requirement (no orbit / science objective missed) can never look like a win
+
+
+static func proximity(d: Dictionary, rocket: Dictionary, flight: Dictionary) -> Dictionary:
+	var goal: Dictionary = GOALS[d["goal"]]
+	var sat := sat_stats(d)
+	var orbit_ok := bool(flight.get("orbit_ok", false))
+	var ap := float(flight.get("ap", 0.0))
+	var pe := float(flight.get("pe", -1.0e6))
+	var hull := float(flight.get("integrity", 100.0))
+	var max_alt := float(flight.get("max_alt", 0.0))
+	var sr := science_result(d, ap, pe, hull) if orbit_ok else {}
+	var reqs: Array = []
+	# 1) reach a stable orbit (partial credit for how high / how close to a stable perigee the rocket got)
+	var s_orbit := 1.0
+	var d_orbit := TranslationServer.translate("MP_D_ORBIT_OK")
+	if not orbit_ok:
+		var reach := clampf(max_alt / (float(goal["ap_target"]) * 0.9), 0.0, 1.0) * 0.55
+		if pe > 0.0 and ap > 0.0:
+			reach += 0.40 * clampf(pe / FlightModel.SAFE_PE, 0.0, 1.0)
+		s_orbit = clampf(reach, 0.0, 0.95)
+		d_orbit = TranslationServer.translate("MP_D_ORBIT_NO") % int(max_alt / 1000.0)
+	reqs.append({"id": "orbit", "key": "MP_R_ORBIT", "score": s_orbit, "ok": orbit_ok, "detail": d_orbit})
+	# 2) orbit altitude inside the window this scientific goal needs
+	var mean_km := (ap + pe) * 0.5 / 1000.0
+	var s_win := 0.0
+	var d_win := TranslationServer.translate("MP_D_NOT_REACHED")
+	if orbit_ok:
+		s_win = float(sr["orbit_q"])
+		d_win = "%d km (%d-%d km)" % [int(mean_km), int(goal["best"][0]), int(goal["best"][1])]
+	reqs.append({"id": "window", "key": "MP_R_WINDOW", "score": clampf(s_win / PROX_WINDOW_MIN, 0.0, 1.0), "ok": orbit_ok and s_win >= PROX_WINDOW_MIN, "detail": d_win})
+	# 3) the vehicle / payload survived
+	reqs.append({"id": "hull", "key": "MP_R_HULL", "score": clampf(hull / PROX_HULL_MIN, 0.0, 1.0), "ok": hull >= PROX_HULL_MIN,
+		"detail": "%d%% (>= %d%%)" % [int(hull), int(PROX_HULL_MIN)]})
+	# 4-6) satellite systems: power, battery, data link (ratios of supply to demand)
+	for item in [["power", "MP_R_POWER", float(sat["power_ratio"]), PROX_RATIO_MIN], ["batt", "MP_R_BATT", float(sat["batt_ratio"]), PROX_BATT_MIN],
+			["data", "MP_R_DATA", float(sat["data_ratio"]), PROX_RATIO_MIN]]:
+		var ratio: float = item[2]
+		var need: float = item[3]
+		var sc := clampf(ratio / need, 0.0, 1.0) if orbit_ok else 0.0
+		reqs.append({"id": item[0], "key": item[1], "score": sc, "ok": orbit_ok and ratio >= need,
+			"detail": ("%d%% (>= %d%%)" % [int(ratio * 100.0), int(need * 100.0)]) if orbit_ok else TranslationServer.translate("MP_D_NOT_REACHED")})
+	# 7) the scientific objective itself (science return reaching the minimum for a successful mission)
+	var science := float(sr["science"]) if orbit_ok else 0.0
+	reqs.append({"id": "science", "key": "MP_R_SCIENCE", "score": clampf(science / SCI_MIN, 0.0, 1.0), "ok": orbit_ok and science >= SCI_MIN,
+		"detail": ("%d%% (>= %d%%)" % [int(science * 100.0), int(SCI_MIN * 100.0)]) if orbit_ok else TranslationServer.translate("MP_D_NOT_REACHED")})
+	var total := 0.0
+	var wsum := 0.0
+	var all_ok := true
+	for r in reqs:
+		var w: float = PROX_WEIGHTS[r["id"]]
+		total += w * float(r["score"])
+		wsum += w
+		if not bool(r["ok"]):
+			all_ok = false
+	var percent := int(floor(total / wsum * 100.0 + 0.5))
+	var critical_failed: bool = not orbit_ok or science < SCI_MIN
+	if all_ok:
+		percent = 100
+	else:
+		percent = mini(percent, 99)
+		if critical_failed:
+			percent = mini(percent, PROX_CRITICAL_CAP)
+	# recommendations: the failed requirements that cost the most points first
+	var losses: Array = []
+	for r in reqs:
+		# a satellite that never reached orbit cannot be judged yet: only the launch itself is worth advice then
+		if not orbit_ok and not (str(r["id"]) in ["orbit", "hull"]):
+			continue
+		if not bool(r["ok"]):
+			losses.append([PROX_WEIGHTS[r["id"]] * (1.0 - float(r["score"])), str(r["id"])])
+	losses.sort_custom(func(a, b): return a[0] > b[0])
+	var recs: Array = []
+	for l in losses:
+		match str(l[1]):
+			"orbit":
+				recs.append("MP_REC_ORBIT")
+			"window":
+				recs.append("TIP_ORBIT_LOW" if mean_km < float(goal["best"][0]) else "TIP_ORBIT_HIGH")
+			"hull":
+				recs.append("TIP_HULL")
+			"power":
+				recs.append("TIP_POWER")
+			"batt":
+				recs.append("TIP_BATT")
+			"data":
+				recs.append("TIP_DATA")
+			"science":
+				recs.append("MP_REC_SCIENCE")
+		if recs.size() >= 3:
+			break
+	return {"percent": percent, "reqs": reqs, "recs": recs, "critical_failed": critical_failed, "all_ok": all_ok}
