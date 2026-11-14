@@ -1,0 +1,40 @@
+class_name StringsCam
+extends RefCounted
+## Camera controls + mission-select screen texts.
+
+const DATA: Dictionary = {
+	"CAM_HINT_MENU": ["Camera: hold LMB and drag - rotate 360 | wheel - zoom | hold RMB and drag - pan | R - reset | double-click an object - focus",
+		"Камера: ЛКМ + рух миші - обертання 360° | коліщатко - масштаб | ПКМ + рух - зсув точки огляду | R - скидання | подвійний клік по об'єкту - фокус"],
+	"CAM_HINT_MISSION": ["C - free camera (pauses the simulation so you can inspect safely)",
+		"C - вільна камера (ставить симуляцію на паузу, щоб безпечно оглядати)"],
+	"CAM_INSPECT": ["INSPECT MODE - simulation paused. LMB drag rotate | wheel zoom | RMB drag pan | double-click focus | C or R to resume",
+		"РЕЖИМ ОГЛЯДУ - симуляцію призупинено. ЛКМ - обертання | коліщатко - масштаб | ПКМ - зсув | подвійний клік - фокус | C або R - продовжити"],
+	# --- mission select
+	"MS_LAUNCH": ["Launch mission", "Почати місію"],
+	"MS_REPLAY": ["Replay mission", "Пройти ще раз"],
+	"MS_DIFFICULTY": ["Difficulty", "Складність"],
+	"MS_PROGRESS": ["Progress", "Прогрес"],
+	"MS_BEST": ["Best score", "Найкращий рахунок"],
+	"MS_STATUS_NEW": ["Not played yet", "Ще не грали"],
+	"MS_STATUS_DONE": ["Completed - you can replay it to improve your rating", "Пройдено - можна повторити, щоб покращити оцінку"],
+	"MS_STATUS_READY": ["Ready to fly", "Готово до запуску"],
+	"MS_STATUS_LOCKED": ["Locked - complete the previous mission first", "Заблоковано - спершу пройдіть попередню місію"],
+	"MS_STATUS_SOON": ["Coming soon - this mission is still being designed", "Незабаром - цю місію ще розробляють"],
+	"MS_LEARN": ["You will learn", "Чого ви навчитесь"],
+	"MS_M1_SKILL": ["Turning a scientific goal into requirements, trading mass, power, data and budget, and verifying a design before launch.",
+		"Перетворювати наукову мету на вимоги, балансувати масу, енергію, дані та бюджет і перевіряти проєкт перед запуском."],
+	"MS_M2_SKILL": ["Moving in zero gravity with inertia and limited gas, and how repairing hardware brings science back online.",
+		"Рухатись у невагомості з інерцією та обмеженим газом і розуміти, як ремонт обладнання повертає науку."],
+	"MS_M3_SKILL": ["Rendezvous and docking: relative speed, alignment and fuel - and delivering a fragile experiment.",
+		"Зближення та стикування: відносна швидкість, вирівнювання, паливо - і доставка крихкого експерименту."],
+	"MS_M4_SKILL": ["Transfer orbits and the cost of leaving Earth orbit (planned).", "Траєкторії переходу та ціна виходу з орбіти Землі (заплановано)."],
+	"MS_M5_SKILL": ["Deep-space communication delays and long-duration science (planned).",
+		"Затримки зв'язку в далекому космосі й тривала наукова робота (заплановано)."],
+	"DIFF_1": ["Beginner", "Початківець"],
+	"DIFF_2": ["Easy", "Легко"],
+	"DIFF_3": ["Medium", "Середньо"],
+	"DIFF_4": ["Hard", "Складно"],
+	"DIFF_5": ["Expert", "Експерт"],
+	"MS_HINT_KEYS": ["Up / Down - choose | Enter - launch | Esc - back", "Вгору / вниз - вибір | Enter - почати | Esc - назад"],
+	"MS_SECRET": ["CLASSIFIED", "СЕКРЕТНО"],
+}
