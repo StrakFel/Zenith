@@ -8,6 +8,7 @@ var _label: Label
 var _mission_mode := false
 var _top := -1.0
 var _right := false
+var _compact := false
 
 
 ## top >= 0: centred at that y. top < 0: bottom corner (left, or right when `right`).
@@ -44,8 +45,8 @@ func _layout() -> void:
 	if _top >= 0.0:
 		_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 		_panel.offset_top = _top
-		_panel.offset_left = -215
-		_panel.offset_right = 215
+		_panel.offset_left = -165 if _compact else -215
+		_panel.offset_right = 165 if _compact else 215
 	elif _right:
 		_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
 		_panel.offset_left = -452
@@ -69,6 +70,13 @@ func set_mission_mode(on: bool, top: float = -2.0) -> void:
 	_label.text = "CAM_HINT_MISSION" if on else "CAM_HINT_MENU"
 	if top > -1.5:
 		_top = top
+	_layout()
+
+
+## Narrow variant for screens with side panels (assembly): wraps into 3 lines between the panels.
+func set_compact(on: bool) -> void:
+	_compact = on
+	_label.custom_minimum_size.x = 320.0 if on else 420.0
 	_layout()
 
 

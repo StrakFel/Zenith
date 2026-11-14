@@ -1,4 +1,4 @@
-﻿extends SceneTree
+extends SceneTree
 ## End-to-end test of mission 1 through the real scene (assembly -> countdown ->
 ## autopilot flight -> deploy -> result screen -> saved progress).
 ##   Godot --headless --path . --script res://Tools/e2e_m1.gd -- kestrel/l/aero [scale]
@@ -32,7 +32,7 @@ func _process(_d: float) -> bool:
 	if not _launched:
 		_launched = true
 		var p := _spec.split("/")
-		m._on_launch({"engine": p[0], "tank": p[1], "nose": p[2]})
+		m._on_launch({"engine": p[0], "tank": p[1], "nose": p[2], "upper": p[3] if p.size() > 3 else ""})
 		m.dev_autopilot = true
 		return false
 	for c in m.overlay.get_children():
@@ -40,6 +40,9 @@ func _process(_d: float) -> bool:
 			var gs := root.get_node("GameState")
 			print("RESULT_SCREEN shown. state=", m.state, " progress=", gs.progress)
 			if m.model != null:
+				print("stage=", m.model.stage, " sep_waste=", snappedf(m.model.sep_waste, 0.01), " dead_t=", snappedf(m.model.dead_mass_time, 0.1),
+					" fairing_on=", m.model.fairing_on, " early=", m.model.fairing_early, " rel=", snappedf(float(m.stats["rel"]), 0.01),
+					" dv=", int(m.stats["dv"]), " twr=", snappedf(float(m.stats["twr"]), 0.01), " cost=", m.stats["cost"])
 				print("flight time=", int(m.model.time), "s fuel=", snappedf(m.model.fuel_fraction(), 0.01),
 					" integrity=", int(m.model.integrity))
 			quit(0)

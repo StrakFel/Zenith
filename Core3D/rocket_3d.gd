@@ -9,6 +9,7 @@ const NOSE_H := {"std": 12.0, "aero": 18.0}
 const TANK_H := {"s": 14.0, "m": 22.0, "l": 32.0}
 const ENGINE_H := {"spark": 5.5, "kestrel": 7.0, "phoenix": 8.5}
 const ENGINE_R := {"spark": 1.25, "kestrel": 1.75, "phoenix": 1.9}
+const UPPER_H := {"u_s": 12.0, "u_m": 17.0}     # interstage (3 m) + upper tank
 const DEFAULTS := {"nose": "std", "tank": "m", "engine": "kestrel"}
 
 var build: Dictionary = {}
@@ -30,6 +31,8 @@ var _light: OmniLight3D
 var _holo: ShaderMaterial
 var _t := 0.0
 var _thrust := 0.0
+var stage2_active := false
+var _er_override := -1.0
 
 
 func _ready() -> void:
@@ -47,6 +50,8 @@ func _slot_h(slot: String, id: String) -> float:
 			return float(NOSE_H[id])
 		"tank":
 			return float(TANK_H[id])
+		"upper":
+			return float(UPPER_H.get(id, 0.0))
 		_:
 			return float(ENGINE_H[id])
 
@@ -56,9 +61,13 @@ func _id_or_default(slot: String) -> String:
 	return id if id != "" else str(DEFAULTS[slot])
 
 
+func _upper_h() -> float:
+	return _slot_h("upper", str(build.get("upper", "")))
+
+
 func total_height() -> float:
 	return _slot_h("engine", _id_or_default("engine")) + _slot_h("tank", _id_or_default("tank")) \
-		+ _slot_h("nose", _id_or_default("nose"))
+		+ _upper_h() + _slot_h("nose", _id_or_default("nose"))
 
 
 ## y range (bottom, top) of a slot in the stack frame (origin at the bottom).
@@ -66,13 +75,16 @@ func slot_span(slot: String) -> Vector2:
 	var eh := _slot_h("engine", _id_or_default("engine"))
 	var th := _slot_h("tank", _id_or_default("tank"))
 	var nh := _slot_h("nose", _id_or_default("nose"))
+	var uh := _upper_h()
 	match slot:
 		"engine":
 			return Vector2(0.0, eh)
 		"tank":
 			return Vector2(eh, eh + th)
+		"upper":
+			return Vector2(eh + th, eh + th + uh)
 		_:
-			return Vector2(eh + th, eh + th + nh)
+			return Vector2(eh + th + uh, eh + th + uh + nh)
 
 
 ## World position of the centre of a slot.
@@ -102,9 +114,19 @@ func set_build(b: Dictionary, with_ghosts: bool = false) -> void:
 	_brand.clear()
 	var eh := _slot_h("engine", _id_or_default("engine"))
 	var th := _slot_h("tank", _id_or_default("tank"))
-	var ys := {"engine": 0.0, "tank": eh, "nose": eh + th}
-	for slot in ["engine", "tank", "nose"]:
+	var uh := _upper_h()
+	var ys := {"engine": 0.0, "tank": eh, "upper": eh + th, "nose": eh + th + uh}
+	stage2_active = false
+	_er_override = -1.0
+	for slot in ["engine", "tank", "upper", "nose"]:
 		var id := str(build.get(slot, ""))
+		if slot == "upper":
+			if id != "":
+				var up := _make_upper(uh)
+				up.position = Vector3(0, ys[slot], 0)
+				_stack.add_child(up)
+				_parts["upper"] = up
+			continue
 		if id != "":
 			var scene: PackedScene = load("res://Assets/Models/rocket_%s_%s.glb" % [slot, id])
 			var inst: Node3D = scene.instantiate()
@@ -125,6 +147,106 @@ func set_build(b: Dictionary, with_ghosts: bool = false) -> void:
 	_fx_root.position = Vector3(0, -total_height() * 0.5 + 0.2, 0)
 	_flame.scale = Vector3(er * 1.15, 1.0, er * 1.15)
 	_core.scale = Vector3(er * 0.7, 1.0, er * 0.7)
+
+
+func _mat(col: Color, metal: float, rough: float) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_color = col
+	m.metallic = metal
+	m.roughness = rough
+	return m
+
+
+## Procedural second stage: dark interstage frustum (leaves with stage 1) + white upper tank + engine bell.
+func _make_upper(h: float) -> Node3D:
+	var root := Node3D.new()
+	var inter := Node3D.new()
+	inter.name = "interstage"
+	root.add_child(inter)
+	var fm := MeshInstance3D.new()
+	var fc := CylinderMesh.new()
+	fc.height = 3.0
+	fc.bottom_radius = RADIUS
+	fc.top_radius = 1.9
+	fc.radial_segments = 40
+	fm.mesh = fc
+	fm.position = Vector3(0, 1.5, 0)
+	fm.material_override = _mat(Color(0.16, 0.18, 0.23), 0.5, 0.45)
+	inter.add_child(fm)
+	var bell := MeshInstance3D.new()
+	var bc := CylinderMesh.new()
+	bc.height = 2.4
+	bc.top_radius = 0.35
+	bc.bottom_radius = 0.95
+	bc.radial_segments = 24
+	bell.mesh = bc
+	bell.position = Vector3(0, 1.4, 0)
+	bell.material_override = _mat(Color(0.35, 0.37, 0.43), 0.8, 0.35)
+	root.add_child(bell)
+	var th := h - 3.0
+	var tm := MeshInstance3D.new()
+	var tc := CylinderMesh.new()
+	tc.height = th
+	tc.top_radius = 1.9
+	tc.bottom_radius = 1.9
+	tc.radial_segments = 40
+	tm.mesh = tc
+	tm.position = Vector3(0, 3.0 + th * 0.5, 0)
+	tm.material_override = _mat(Color(0.92, 0.94, 0.97), 0.25, 0.4)
+	root.add_child(tm)
+	var band := MeshInstance3D.new()
+	var bm := CylinderMesh.new()
+	bm.height = 0.5
+	bm.top_radius = 1.93
+	bm.bottom_radius = 1.93
+	bm.radial_segments = 40
+	band.mesh = bm
+	band.position = Vector3(0, 3.0 + th * 0.8, 0)
+	var bmat := _mat(Color(1.0, 0.45, 0.1), 0.2, 0.5)
+	bmat.emission_enabled = true
+	bmat.emission = Color(1.0, 0.4, 0.08)
+	bmat.emission_energy_multiplier = 0.35
+	band.material_override = bmat
+	root.add_child(band)
+	return root
+
+
+## Throws stage 1 (engine, tank, interstage, branding) off the stack. The parts keep their world transform and are
+## re-parented under a new holder (returned) so the director can animate their drift. Stage 2 becomes the thrusting stage.
+func separate_stage1(new_parent: Node) -> Node3D:
+	var holder := Node3D.new()
+	new_parent.add_child(holder)
+	holder.global_transform = _stack.global_transform
+	var movers: Array[Node3D] = []
+	for k in ["engine", "tank"]:
+		if _parts.has(k):
+			movers.append(_parts[k])
+			_parts.erase(k)
+	if _parts.has("upper"):
+		var inter := (_parts["upper"] as Node3D).get_node_or_null("interstage")
+		if inter != null:
+			movers.append(inter)
+	for l in _brand:
+		movers.append(l)
+	_brand.clear()
+	for n in movers:
+		var xf := n.global_transform
+		n.get_parent().remove_child(n)
+		holder.add_child(n)
+		n.global_transform = xf
+	stage2_active = true
+	_er_override = 1.0
+	var eh := _slot_h("engine", _id_or_default("engine"))
+	var th := _slot_h("tank", _id_or_default("tank"))
+	_fx_root.position = Vector3(0, -total_height() * 0.5 + eh + th + 0.5, 0)
+	return holder
+
+
+## World position of the interface between stage 1 and stage 2 (separation effects).
+func stage_interface_world() -> Vector3:
+	var eh := _slot_h("engine", _id_or_default("engine"))
+	var th := _slot_h("tank", _id_or_default("tank"))
+	return _stack.to_global(Vector3(0, eh + th + 1.5, 0))
 
 
 func _make_ghost(slot: String) -> Node3D:
@@ -272,7 +394,7 @@ func _build_fx() -> void:
 func set_thrust(t: float, ambient: float, drift: Vector3) -> void:
 	_thrust = t
 	var on := t > 0.02
-	var er := float(ENGINE_R[_id_or_default("engine")])
+	var er := float(ENGINE_R[_id_or_default("engine")]) if _er_override < 0.0 else _er_override
 	var vac := 1.0 - clampf(ambient, 0.0, 1.0)
 	var length := (16.0 + 34.0 * t) * (0.7 + er * 0.35) * (1.0 + vac * 0.8)
 	var width := 1.0 + vac * 1.1

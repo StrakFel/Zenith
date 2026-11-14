@@ -25,6 +25,24 @@ var isp_vac := 340.0
 var cd := 0.4
 var area := 10.0
 
+# staging (optional second stage). `fuel` / `fuel_cap` always describe the ACTIVE stage's tank.
+var stage := 1
+var has_upper := false
+var reserve_fuel := 0.0         # upper-stage propellant carried (as dead weight) until separation
+var stage1_dry := 0.0           # tank + engine structure that is thrown away at separation
+var upper_thrust := 0.0
+var upper_isp_sl := 255.0
+var upper_isp_vac := 380.0
+var fairing_mass := 0.0
+var fairing_on := true
+var ignite_in := 0.0            # seconds until the next engine lights after separation
+var sep_waste := -1.0           # fraction of stage-1 propellant thrown away unused at separation (-1 = not separated)
+var sep_time := -1.0
+var fairing_time := -1.0
+var fairing_early := false
+var dead_mass_time := 0.0       # seconds an EMPTY stage was carried around
+const CD_NO_FAIRING := 0.22     # extra drag of the exposed payload
+
 # state
 var r := R
 var theta := 0.0
@@ -53,10 +71,20 @@ func setup(stats: Dictionary) -> void:
 	isp_sl = float(stats["isp_sl"])
 	isp_vac = float(stats["isp_vac"])
 	cd = float(stats["cd"])
+	stage = 1
+	has_upper = int(stats.get("stages", 1)) == 2
+	reserve_fuel = float(stats.get("reserve", 0.0))
+	stage1_dry = float(stats.get("stage1_dry", 0.0))
+	fairing_mass = float(stats.get("fairing_mass", 0.0))
+	fairing_on = true
+	if has_upper:
+		upper_thrust = float(stats["u_thrust"])
+		upper_isp_sl = float(stats["u_isp_sl"])
+		upper_isp_vac = float(stats["u_isp_vac"])
 
 
 func mass() -> float:
-	return dry_mass + fuel
+	return dry_mass + fuel + reserve_fuel
 
 
 func altitude() -> float:
@@ -65,6 +93,48 @@ func altitude() -> float:
 
 func speed() -> float:
 	return sqrt(vr * vr + vt * vt)
+
+
+## Drop the spent first stage: its structure and unused propellant leave, the upper stage becomes active
+## (new thrust / Isp / fuel). Returns {"ok", "waste", "shock"}; shock = structural damage from separating in dense air.
+func separate_stage() -> Dictionary:
+	if stage != 1 or not has_upper:
+		return {"ok": false}
+	sep_waste = fuel / fuel_cap if fuel_cap > 0.0 else 0.0
+	sep_time = time
+	var shock := clampf(q / Q_LIMIT - 0.3, 0.0, 1.0) * 40.0      # separating near Max-Q is dangerous
+	dry_mass -= stage1_dry
+	fuel = reserve_fuel
+	fuel_cap = reserve_fuel
+	reserve_fuel = 0.0
+	max_thrust = upper_thrust
+	isp_sl = upper_isp_sl
+	isp_vac = upper_isp_vac
+	stage = 2
+	engine_on = false
+	ignite_in = 2.0
+	integrity = maxf(integrity - shock, 1.0)
+	return {"ok": true, "waste": sep_waste, "shock": shock}
+
+
+## Jettison the payload fairing: its mass leaves, but the payload is exposed (extra drag; heat/pressure damage in air).
+func jettison_fairing() -> Dictionary:
+	if not fairing_on:
+		return {"ok": false}
+	fairing_on = false
+	fairing_time = time
+	dry_mass -= fairing_mass
+	var dmg := 0.0
+	var h := altitude()
+	if h < 80_000.0:
+		dmg = 8.0 + clampf(air_density() / 0.02, 0.0, 1.0) * 55.0
+		fairing_early = true
+	integrity = maxf(integrity - dmg, 1.0)
+	return {"ok": true, "damage": dmg, "early": fairing_early}
+
+
+func current_cd() -> float:
+	return cd + (0.0 if fairing_on else CD_NO_FAIRING)
 
 
 func air_density() -> float:
@@ -84,6 +154,12 @@ func step(dt: float) -> void:
 	if crashed:
 		return
 	time += dt
+	if ignite_in > 0.0:
+		ignite_in -= dt
+		if ignite_in <= 0.0:
+			engine_on = true
+	if fuel <= 0.0 and has_upper and stage == 1:
+		dead_mass_time += dt
 	var h := r - R
 	var m := mass()
 	thrust_now = 0.0
@@ -97,7 +173,7 @@ func step(dt: float) -> void:
 	var g := MU / (r * r)
 	var v := sqrt(vr * vr + vt * vt)
 	q = 0.5 * air_density() * v * v
-	var drag := q * cd * area
+	var drag := q * current_cd() * area
 	var ar := -g + vt * vt / r
 	var at := -vr * vt / r
 	if v > 0.01:

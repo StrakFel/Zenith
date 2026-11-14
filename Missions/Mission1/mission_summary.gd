@@ -39,6 +39,7 @@ func setup(design: Dictionary, sat: Dictionary, rk: Dictionary, rocket: Dictiona
 	var e: Dictionary = M1Parts.ENGINES[rk["engine"]]
 	cols.add_child(_col("SEG_LAUNCH", [
 		["M1_SLOT_NOSE", tr(str(n["name"]))], ["M1_SLOT_TANK", tr(str(t["name"]))], ["M1_SLOT_ENGINE", tr(str(e["name"]))],
+		["M1_ST_STAGES", "%d" % int(rocket["stages"])],
 		["M1_ST_TOTAL_MASS", Units.kg(float(rocket["mass_wet"]))],
 		["M1_ST_TWR", "%.2f" % float(rocket["twr"])],
 		["M1_ST_DV", "%d / %d %s" % [int(rocket["dv"]), int(M1Parts.REQUIRED_DV), tr("UNIT_MS")]],

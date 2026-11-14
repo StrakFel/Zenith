@@ -7,7 +7,16 @@ const BUDGET := 170
 const PAYLOAD_MASS := 1000.0  # the satellite (kg)
 const REQUIRED_DV := 5200.0   # rough delta-v needed for orbit in this scaled-down world (m/s)
 
-const SLOTS: Array[String] = ["nose", "tank", "engine"]
+const SLOTS: Array[String] = ["nose", "upper", "tank", "engine"]
+const FAIRING_SHARE := 0.85    # share of the nose mass that is the fairing (dropped when it is jettisoned)
+
+## Optional second stage: its own tank + vacuum engine. thrust is the sea-level equivalent (same convention as ENGINES).
+const UPPERS: Dictionary = {
+	"u_s": {"rel": 0.96, "name": "M1_UP_S", "desc": "M1_UP_S_D", "dry": 450.0, "fuel": 4200.0, "thrust": 110000.0,
+		"isp_sl": 255.0, "isp_vac": 380.0, "cost": 26, "h": 12.0, "w": 40.0},
+	"u_m": {"rel": 0.94, "name": "M1_UP_M", "desc": "M1_UP_M_D", "dry": 900.0, "fuel": 9000.0, "thrust": 190000.0,
+		"isp_sl": 260.0, "isp_vac": 392.0, "cost": 44, "h": 17.0, "w": 40.0},
+}
 
 const NOSES: Dictionary = {
 	"std": {"rel": 0.99, "name": "M1_NOSE_STD", "desc": "M1_NOSE_STD_D", "mass": 500.0, "cost": 10, "cd": 0.30, "h": 70.0},
@@ -34,6 +43,8 @@ static func catalog(slot: String) -> Dictionary:
 			return NOSES
 		"tank":
 			return TANKS
+		"upper":
+			return UPPERS
 		_:
 			return ENGINES
 
@@ -44,6 +55,9 @@ static func part_stat_lines(slot: String, id: String) -> Array:
 	match slot:
 		"nose":
 			return [["M1_ST_MASS", Units.kg(float(p["mass"]))], ["M1_ST_DRAG", "%.2f" % float(p["cd"])], ["M1_ST_REL", "%d%%" % int(float(p["rel"]) * 100.0)]]
+		"upper":
+			return [["M1_ST_FUEL", Units.kg(float(p["fuel"]))], ["M1_ST_THRUST", Units.kn(float(p["thrust"]))],
+				["M1_ST_ISP", Units.sec(float(p["isp_vac"]))], ["M1_ST_REL", "%d%%" % int(float(p["rel"]) * 100.0)]]
 		"tank":
 			return [["M1_ST_FUEL", Units.kg(float(p["fuel"]))], ["M1_ST_MASS", Units.kg(float(p["dry"]))], ["M1_ST_REL", "%d%%" % int(float(p["rel"]) * 100.0)]]
 		_:
@@ -83,7 +97,30 @@ static func compute(build: Dictionary, payload: float = PAYLOAD_MASS, extra_cost
 		isp_sl = float(ENGINES[e]["isp_sl"])
 		isp_vac = float(ENGINES[e]["isp_vac"])
 		rel *= float(ENGINES[e]["rel"])
-	var wet := dry + fuel
+	# optional upper stage (jettisoned stage 1 = tank + engine)
+	var u := str(build.get("upper", ""))
+	var stage1_dry := 0.0
+	if t != "":
+		stage1_dry += float(TANKS[t]["dry"])
+	if e != "":
+		stage1_dry += float(ENGINES[e]["mass"])
+	var reserve := 0.0
+	out["stages"] = 1
+	if u != "":
+		var up: Dictionary = UPPERS[u]
+		cost += int(up["cost"])
+		dry += float(up["dry"])
+		reserve = float(up["fuel"])
+		rel *= float(up["rel"])
+		out["stages"] = 2
+		out["u_thrust"] = float(up["thrust"])
+		out["u_isp_sl"] = float(up["isp_sl"])
+		out["u_isp_vac"] = float(up["isp_vac"])
+		out["u_dry"] = float(up["dry"])
+	out["reserve"] = reserve
+	out["stage1_dry"] = stage1_dry
+	out["fairing_mass"] = float(NOSES[n]["mass"]) * FAIRING_SHARE if n != "" else 0.0
+	var wet := dry + fuel + reserve
 	out["cost"] = cost
 	out["over_budget"] = cost > BUDGET
 	out["mass_dry"] = dry
@@ -95,7 +132,13 @@ static func compute(build: Dictionary, payload: float = PAYLOAD_MASS, extra_cost
 	out["isp_sl"] = isp_sl
 	out["isp_vac"] = isp_vac
 	out["twr"] = thrust / (wet * 9.81) if wet > 0.0 else 0.0
-	out["dv"] = isp_vac * G0 * log(wet / dry) if (isp_vac > 0.0 and fuel > 0.0) else 0.0
+	var dv := isp_vac * G0 * log(wet / (dry + reserve)) if (isp_vac > 0.0 and fuel > 0.0) else 0.0
+	if u != "" and fuel > 0.0:
+		# two-stage rocket equation: stage 1 burns with the upper stage on top, then stage 1 is dropped
+		var m_sep := dry + reserve - stage1_dry
+		var m_up_dry := m_sep - reserve
+		dv += float(out["u_isp_vac"]) * G0 * log(m_sep / maxf(m_up_dry, 1.0))
+	out["dv"] = dv
 	out["complete"] = n != "" and t != "" and e != ""
 	return out
 
@@ -116,6 +159,8 @@ static func readiness(stats: Dictionary) -> Array[String]:
 		msgs.append("M1_RDY_TWR_HIGH")
 	if float(stats["dv"]) < REQUIRED_DV:
 		msgs.append("M1_RDY_DV_LOW")
+		if int(stats["stages"]) == 1:
+			msgs.append("M1_RDY_TRY_UPPER")
 	if msgs.is_empty():
 		msgs.append("M1_RDY_OK")
 	return msgs

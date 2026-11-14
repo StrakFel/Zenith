@@ -226,12 +226,17 @@ func _run() -> void:
 	await _frames(5)
 	var installs: Array = []
 	_collect_buttons(root, "M1_INSTALL", installs)
-	await _click(installs[2])
+	await _click(installs[1])
+	await _click_text("M1_SLOT_UPPER")
+	await _frames(5)
+	installs.clear()
+	_collect_buttons(root, "M1_INSTALL", installs)
+	await _click(installs[0])
 	await _click_text("M1_SLOT_NOSE")
 	await _frames(5)
 	installs.clear()
 	_collect_buttons(root, "M1_INSTALL", installs)
-	await _click(installs[1])
+	await _click(installs[0])
 	await _click_text("M1_SLOT_ENGINE")
 	await _frames(5)
 	installs.clear()
@@ -239,7 +244,7 @@ func _run() -> void:
 	await _click(installs[1])
 	await _frames(10)
 	var bd: Dictionary = m.assembly.build
-	_check(bd["engine"] == "kestrel" and bd["tank"] == "l" and bd["nose"] == "aero", "M1: rocket assembled by clicks %s" % str(bd))
+	_check(bd["engine"] == "kestrel" and bd["tank"] == "m" and bd["nose"] == "std" and bd["upper"] == "u_s", "M1: rocket assembled by clicks %s" % str(bd))
 	_check(await _click_text("M1_TO_REVIEW"), "M1: CLICK Design review")
 	await _frames(40)
 	_check(m.state == m.S.REVIEW, "M1: design review (verification) window is open")
@@ -319,7 +324,7 @@ func _run() -> void:
 
 	# ============================================================ SAVE FILE
 	var cfg := ConfigFile.new()
-	var err := cfg.load("user://zenith_save.cfg")
+	var err := cfg.load("user://zenith_test_save.cfg")
 	var saved: Dictionary = JSON.parse_string(str(cfg.get_value("progress", "data", "{}")))
 	_check(err == OK and saved.has("m1_launch") and saved.has("m2_lunar") and saved.has("m3_docking"), "save file on disk contains all 3 missions")
 
@@ -408,6 +413,8 @@ func _test_pause(m: Node, tag: String) -> void:
 
 # ------------------------------------------------------------------- pilots ------
 func _fly_m1(m: Node) -> bool:
+	var staged := false
+	var fair_done := false
 	var phase := 0
 	var warp2 := false
 	var warp3 := false
@@ -456,6 +463,15 @@ func _fly_m1(m: Node) -> bool:
 		var cur := rad_to_deg(model.pitch)
 		_hold(KEY_D, cur < des - 1.2)
 		_hold(KEY_A, cur > des + 1.2)
+		if model.has_upper and model.stage == 1 and model.fuel <= 1.0 and not staged:
+			staged = true
+			await _key(KEY_G)
+			await _frames(5)
+			_check(model.stage == 2 and m.flight._spent.size() > 0, "M1: G separates stage 1 (stage -> 2, spent stage drifting away in 3D)")
+		if model.fairing_on and h >= 95000.0 and not fair_done:
+			fair_done = true
+			await _key(KEY_F)
+			_check(not model.fairing_on and not model.fairing_early, "M1: F jettisons the fairing above 85 km without damage")
 		if model.in_stable_orbit() and not deployed:
 			deployed = true
 			_release_all()

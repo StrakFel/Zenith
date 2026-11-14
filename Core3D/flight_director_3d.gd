@@ -1,4 +1,4 @@
-﻿class_name FlightDirector3D
+class_name FlightDirector3D
 extends Node
 ## Cinematography + effects for the 3D ascent: countdown orbit camera, "tower cam" at lift-off,
 ## smooth hand-over to a chase camera, camera shake, speed streaks, explosion and the
@@ -25,9 +25,13 @@ var _deploy_t := -1.0
 var _cam_look := Vector3.ZERO
 var _cam_pos := Vector3.ZERO
 var _first := true
+var scene_design: Dictionary = {}
 var _orbit_az := 0.0
 var _wing_scale := 1.0
 var _dish_scale := 1.0
+var _spent: Array = []                # spent stage-1 pieces drifting away: {"n": Node3D, "v": Vector3, "w": Vector3, "t": float}
+var _sep_cam := 0.0                   # >0 while the camera lingers on the separation
+var _ignite_light: OmniLight3D
 
 
 func setup(s: PadScene3D, m: FlightModel, b: Dictionary) -> void:
@@ -166,25 +170,87 @@ func explode() -> void:
 	shake_amp = 12.0
 
 
+## STAGE SEPARATION: the spent first stage (engine, tank, interstage) is released, small separation motors push the two
+## stacks apart, the old stage tumbles away and slowly fades; the upper stage keeps its attitude. Camera lingers a moment.
+func separate_stage() -> void:
+	var rk := scene.rocket
+	var axis := scene.rocket_pivot.global_transform.basis.y.normalized()
+	var at := rk.stage_interface_world()
+	var holder := rk.separate_stage1(scene)
+	var side := axis.cross(Vector3(0, 0, 1)).normalized()
+	_spent.append({"n": holder, "v": -axis * 4.0 + side * 0.8, "w": Vector3(0.08, 0.02, 0.22), "t": 0.0})
+	# separation flash + ring of small motor puffs
+	Fx3D.burst(scene, at, Color(1.0, 0.85, 0.55), 70, 22.0, 1.6, 0.9)
+	Fx3D.burst(scene, at - axis * 2.0, Color(1.0, 0.55, 0.2), 40, 10.0, 2.4, 1.2)
+	Fx3D.burst(scene, at + axis * 1.0, Color(0.85, 0.9, 1.0), 40, 14.0, 1.0, 0.8)
+	_flash.global_position = at
+	_flash.light_energy = 22.0
+	create_tween().tween_property(_flash, "light_energy", 0.0, 0.9)
+	shake_amp = maxf(shake_amp, 5.0)
+	_sep_cam = 2.8
+
+
+## Next engine lights: a bright flash and a spark burst at the new nozzle, with a short light pulse.
+func ignite_stage2() -> void:
+	var rk := scene.rocket
+	var axis := scene.rocket_pivot.global_transform.basis.y.normalized()
+	var nozzle := rk.stage_interface_world() - axis * 0.5
+	Fx3D.burst(scene, nozzle, Color(1.0, 0.9, 0.7), 60, 30.0, 1.4, 0.7)
+	if _ignite_light == null:
+		_ignite_light = OmniLight3D.new()
+		_ignite_light.omni_range = 260.0
+		_ignite_light.light_color = Color(0.8, 0.88, 1.0)
+		_ignite_light.light_energy = 0.0
+		scene.add_child(_ignite_light)
+	_ignite_light.global_position = nozzle
+	_ignite_light.light_energy = 18.0
+	create_tween().tween_property(_ignite_light, "light_energy", 0.0, 0.8)
+	shake_amp = maxf(shake_amp, 2.5)
+
+
+## Jettison the payload fairing early (before deployment): the cone drifts off and the stowed satellite becomes visible.
+func jettison_fairing() -> void:
+	var rk := scene.rocket
+	var axis := scene.rocket_pivot.global_transform.basis.y.normalized()
+	var at := rk.nose_base_world()
+	var n := rk.detach_nose(scene)
+	if n != null:
+		_nose = n
+		_nose_vel = axis * 5.0 + axis.cross(Vector3(0, 0, 1)).normalized() * 2.5
+	Fx3D.burst(scene, at, Color(1.0, 0.9, 0.75), 45, 16.0, 1.2, 0.8)
+	shake_amp = maxf(shake_amp, 1.8)
+	_stow_satellite(at, axis)
+
+
+func _stow_satellite(base: Vector3, axis: Vector3) -> void:
+	if _sat != null:
+		return
+	var packed: PackedScene = load("res://Assets/Models/satellite.glb")
+	_sat = packed.instantiate()
+	_sat.scale = Vector3.ONE * 0.2
+	_apply_design(_sat, scene_design)
+	scene.add_child(_sat)
+	_sat.global_position = base + axis * 4.0
+	_sat.global_transform.basis = scene.rocket_pivot.global_transform.basis * Basis(Vector3.RIGHT, PI * 0.5) * 0.2
+	for w in ["wing_R", "wing_L", "dish"]:
+		var nd := _sat.find_child(w, true, false)
+		if nd is Node3D:
+			(nd as Node3D).scale = Vector3(0.02, 1.0, 1.0)
+
+
 ## Fairing separation + satellite release + panel unfolding. Await it.
 func deploy_satellite(duration: float = 4.5, design: Dictionary = {}) -> void:
 	var rk := scene.rocket
 	rk.set_thrust(0.0, 0.0, Vector3.ZERO)
 	var base := rk.nose_base_world()
-	_nose = rk.detach_nose(scene)
 	var axis := scene.rocket_pivot.global_transform.basis.y.normalized()
-	_nose_vel = axis * 4.0
-	var packed: PackedScene = load("res://Assets/Models/satellite.glb")
-	_sat = packed.instantiate()
-	_sat.scale = Vector3.ONE * 0.2
-	_apply_design(_sat, design)
-	scene.add_child(_sat)
-	_sat.global_position = base + axis * 4.0
-	_sat.global_transform.basis = scene.rocket_pivot.global_transform.basis * Basis(Vector3.RIGHT, PI * 0.5) * 0.2
-	for w in ["wing_R", "wing_L", "dish"]:
-		var n := _sat.find_child(w, true, false)
-		if n is Node3D:
-			(n as Node3D).scale = Vector3(0.02, 1.0, 1.0)
+	var det := rk.detach_nose(scene)
+	if det != null:
+		_nose = det
+		_nose_vel = axis * 4.0
+	scene_design = design
+	if _sat == null:
+		_stow_satellite(base, axis)
 	_deploy_t = 0.0
 	var tw := create_tween()
 	tw.tween_method(_deploy_step.bind(axis), 0.0, 1.0, duration)
@@ -215,7 +281,30 @@ func _process(delta: float) -> void:
 	if _t_lift >= 0.0:
 		_t_lift += delta
 	_update_debris(delta)
+	_update_spent(delta)
 	_update_camera(delta)
+
+
+func _update_spent(delta: float) -> void:
+	var i := _spent.size() - 1
+	while i >= 0:
+		var d: Dictionary = _spent[i]
+		var n: Node3D = d["n"]
+		d["t"] = float(d["t"]) + delta
+		d["v"] = (d["v"] as Vector3) * (1.0 + 0.18 * delta)          # keeps drifting back and slowly speeds up
+		n.global_position += (d["v"] as Vector3) * delta
+		n.rotate_object_local(Vector3(0, 0, 1), (d["w"] as Vector3).z * delta)
+		n.rotate_object_local(Vector3(1, 0, 0), (d["w"] as Vector3).x * delta)
+		if float(d["t"]) > 16.0:
+			n.queue_free()
+			_spent.remove_at(i)
+		elif float(d["t"]) > 11.0:
+			n.scale = Vector3.ONE * clampf((16.0 - float(d["t"])) / 5.0, 0.01, 1.0)
+		i -= 1
+	if _sat != null and _deploy_t < 0.0 and scene.rocket.visible:
+		var axis := scene.rocket_pivot.global_transform.basis.y.normalized()
+		_sat.global_position = scene.rocket.nose_base_world() + axis * 4.0
+		_sat.global_transform.basis = scene.rocket_pivot.global_transform.basis * Basis(Vector3.RIGHT, PI * 0.5) * 0.2
 
 
 func _update_debris(delta: float) -> void:
@@ -265,6 +354,12 @@ func _update_camera(delta: float) -> void:
 	var look_b := pivot + f * 14.0 - Vector3(0, dist * 0.06, 0)
 	if _deploy_t > 0.0:
 		look_b = pivot + f * (6.0 + _deploy_t * 28.0) - Vector3(0, dist * 0.05, 0)
+	if _sep_cam > 0.0:
+		_sep_cam -= delta
+		var lk := clampf(_sep_cam / 2.8, 0.0, 1.0)
+		var iface := scene.rocket.stage_interface_world()
+		look_b = look_b.lerp(iface - f * 8.0, smoothstep(0.0, 0.3, lk))
+		pos_b = pos_b.lerp(pivot + side * 78.0 + Vector3(0, 8.0, 0), smoothstep(0.0, 0.4, lk))
 	var target_pos := pos_a.lerp(pos_b, w)
 	var target_look := look_a.lerp(look_b, w)
 	if _first:

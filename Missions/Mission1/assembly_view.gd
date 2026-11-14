@@ -5,7 +5,7 @@ extends Control
 
 signal launch_requested(build: Dictionary)
 
-const SLOT_KEYS := {"nose": "M1_SLOT_NOSE", "tank": "M1_SLOT_TANK", "engine": "M1_SLOT_ENGINE"}
+const SLOT_KEYS := {"nose": "M1_SLOT_NOSE", "upper": "M1_SLOT_UPPER", "tank": "M1_SLOT_TANK", "engine": "M1_SLOT_ENGINE"}
 
 
 # ------------------------------------------------------------------ icon ----
@@ -33,6 +33,8 @@ class PartIcon extends Control:
 				RocketDrawer.draw_nose(self, id, r, 1.0)
 			"tank":
 				RocketDrawer.draw_tank(self, id, r, 1.0)
+			"upper":
+				RocketDrawer.draw_tank(self, "s", r, 1.0)
 			_:
 				RocketDrawer.draw_engine(self, id, r, 1.0)
 
@@ -131,6 +133,8 @@ class PadCanvas extends Control:
 		var off := -get_global_rect().position
 		var pulse := 0.5 + 0.5 * sin(_t * 4.0)
 		for slot in M1Parts.SLOTS:
+			if slot == "upper" and str(build.get("upper", "")) == "":
+				continue   # optional stage: no bracket while it is not installed
 			var span := rk.slot_world_span(slot)
 			if cam.is_position_behind(span[0]) or cam.is_position_behind(span[1]):
 				continue
@@ -156,7 +160,7 @@ class PadCanvas extends Control:
 				draw_rect(hr, UIKit.C_ORANGE, false, 3.0)
 
 # ------------------------------------------------------------------ view ----
-var build: Dictionary = {"nose": "", "tank": "", "engine": ""}
+var build: Dictionary = {"nose": "", "upper": "", "tank": "", "engine": ""}
 var scene3d: PadScene3D
 var payload_mass := M1Parts.PAYLOAD_MASS
 var sat_cost := 0
@@ -201,8 +205,16 @@ func _ready() -> void:
 func _build_left() -> Control:
 	var p := UIKit.panel()
 	p.custom_minimum_size = Vector2(330, 0)
-	var v := UIKit.vbox(8)
-	p.add_child(v)
+	# everything scrolls except the pinned "design review" button, so it is always reachable (small windows, 4 slots)
+	var outer := UIKit.vbox(8)
+	p.add_child(outer)
+	var sc := ScrollContainer.new()
+	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	outer.add_child(sc)
+	var v := UIKit.vbox(6)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sc.add_child(v)
 	v.add_child(UIKit.label("M1_ASM_TITLE", 26, Color.WHITE))
 	v.add_child(UIKit.label("M1_ASM_HINT", 13, UIKit.C_MUTED))
 	v.add_child(HSeparator.new())
@@ -228,7 +240,7 @@ func _build_left() -> Control:
 	g.add_theme_constant_override("v_separation", 2)
 	v.add_child(g)
 	for r in [["M1_ST_TOTAL_MASS", "mass"], ["M1_ST_FUEL", "fuel"], ["M1_ST_THRUST", "thrust"],
-			["M1_ST_TWR", "twr"], ["M1_ST_DV", "dv"]]:
+			["M1_ST_TWR", "twr"], ["M1_ST_DV", "dv"], ["M1_ST_STAGES", "stages"], ["M1_ST_REL", "rel"]]:
 		var k := UIKit.label(r[0], 15, UIKit.C_MUTED)
 		k.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		g.add_child(k)
@@ -246,15 +258,12 @@ func _build_left() -> Control:
 	v.add_child(HSeparator.new())
 	_ready_label = UIKit.label("", 15, UIKit.C_TEXT)
 	_ready_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_ready_label.custom_minimum_size = Vector2(290, 70)
+	_ready_label.custom_minimum_size = Vector2(290, 56)
 	v.add_child(_ready_label)
-	var spacer := Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	v.add_child(spacer)
-	_launch = UIKit.button("M1_TO_REVIEW", Vector2(0, 62))
+	_launch = UIKit.button("M1_TO_REVIEW", Vector2(0, 58))
 	_launch.add_theme_font_size_override("font_size", 22)
 	_launch.pressed.connect(func(): launch_requested.emit(build.duplicate()))
-	v.add_child(_launch)
+	outer.add_child(_launch)
 	return p
 
 
@@ -267,7 +276,7 @@ func _build_right() -> Control:
 	var tabs := UIKit.hbox(6)
 	v.add_child(tabs)
 	var group := ButtonGroup.new()
-	for slot in ["engine", "tank", "nose"]:
+	for slot in ["engine", "tank", "upper", "nose"]:
 		var b := Button.new()
 		b.text = SLOT_KEYS[slot]
 		b.toggle_mode = true
@@ -318,9 +327,11 @@ func _refresh() -> void:
 		var id := str(build[slot])
 		var row: Dictionary = _slot_rows[slot]
 		var lab: Label = row["label"]
-		lab.text = str(M1Parts.catalog(slot)[id]["name"]) if id != "" else "M1_EMPTY"
+		lab.text = str(M1Parts.catalog(slot)[id]["name"]) if id != "" else ("M1_NO_UPPER" if slot == "upper" else "M1_EMPTY")
 		lab.add_theme_color_override("font_color", UIKit.C_TEXT if id != "" else UIKit.C_MUTED)
 		(row["remove"] as Button).disabled = id == ""
+	(_stat_labels["stages"] as Label).text = "%d" % int(st["stages"])
+	(_stat_labels["rel"] as Label).text = "%d%%" % int(float(st["rel"]) * 100.0)
 	(_stat_labels["mass"] as Label).text = Units.kg(float(st["mass_wet"]))
 	(_stat_labels["fuel"] as Label).text = Units.kg(float(st["fuel"]))
 	(_stat_labels["thrust"] as Label).text = Units.kn(float(st["thrust"]))
@@ -338,7 +349,10 @@ func _refresh() -> void:
 	UIKit.set_bar_color(_cost_bar, UIKit.C_BAD if bool(st["over_budget"]) else UIKit.C_WARN)
 	var msgs := M1Parts.readiness(st)
 	var worst: String = msgs[0]
-	_ready_label.text = worst
+	var lines: Array[String] = []
+	for k in msgs.slice(0, 2):
+		lines.append(tr(k))
+	_ready_label.text = "\n".join(lines)
 	_ready_label.add_theme_color_override("font_color", UIKit.C_GOOD if worst == "M1_RDY_OK" else (UIKit.C_MUTED if worst == "M1_RDY_INCOMPLETE" else UIKit.C_WARN))
 	_launch.disabled = not M1Parts.can_launch(st)
 

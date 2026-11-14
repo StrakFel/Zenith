@@ -43,6 +43,10 @@ var cam_hint: CameraHint
 var dev_autopilot := false
 var summary: MissionSummary
 var _pitch_vel := 0.0
+var stage_panel: StagePanel
+var _ign_fx := false
+var _stuck_t := 0.0
+var fairing_late := false
 var auto_warp := true          # time compression: boring parts are skipped unless the player takes over
 var _ms_done: Array[int] = []
 const MILESTONES := [[600.0, "M1_MS_TOWER"], [12000.0, "M1_MS_SKY"], [45000.0, "M1_MS_THIN"], [100000.0, "M1_MS_SPACE"]]
@@ -66,6 +70,8 @@ func _briefing_data() -> Dictionary:
 			["A D", "M1_CTRL_PITCH"],
 			["T", "M1_CTRL_ASSIST"],
 			["Z X", "M1_CTRL_FULLCUT"],
+			["G", "M1_CTRL_STAGE"],
+			["F", "M1_CTRL_FAIRING"],
 			["1 2 3", "M1_CTRL_WARP"],
 			["SPACE", "M1_CTRL_DEPLOY"],
 			["ESC", "M1_CTRL_PAUSE"],
@@ -111,6 +117,7 @@ func _on_design_done(d: Dictionary) -> void:
 		design_view.queue_free()
 		design_view = null
 	state = S.ASSEMBLY
+	cam_hint.set_compact(true)
 	assembly = AssemblyView.new()
 	assembly.scene3d = pad_scene
 	assembly.payload_mass = float(sat["mass"])
@@ -192,7 +199,7 @@ func dev_quick(spec: String) -> void:
 		design_view.queue_free()
 		design_view = null
 	state = S.ASSEMBLY
-	_on_launch({"engine": p[0], "tank": p[1], "nose": p[2]})
+	_on_launch({"engine": p[0], "tank": p[1], "nose": p[2], "upper": p[3] if p.size() > 3 else ""})
 	state = S.FLIGHT
 	model.engine_on = true
 	model.throttle = 1.0
@@ -266,6 +273,16 @@ func _on_launch(b: Dictionary) -> void:
 	hud = FlightHud.new()
 	hud_layer.add_child(hud)
 	hud.build()
+	flight.scene_design = design
+	_ign_fx = false
+	_stuck_t = 0.0
+	fairing_late = false
+	stage_panel = StagePanel.new()
+	hud_layer.add_child(stage_panel)
+	stage_panel.setup(model)
+	stage_panel.separate_requested.connect(_do_separate)
+	stage_panel.fairing_requested.connect(_do_fairing)
+	cam_hint.set_compact(false)
 	cam_hint.set_mission_mode(true, 118.0)
 	state = S.COUNTDOWN
 	_cd = 0.0
@@ -280,6 +297,8 @@ func _process(delta: float) -> void:
 	pad_scene.orbit.user_can_engage = state == S.DESIGN or state == S.ASSEMBLY or state == S.REVIEW
 	if ended or model == null:
 		return
+	if stage_panel != null:
+		stage_panel.refresh(delta)
 	if inspecting:
 		# INSPECT MODE: the simulation is frozen, only the camera moves
 		if hud != null:
@@ -328,6 +347,10 @@ func _shake_factor() -> float:
 ## Test autopilot (Tools/e2e_m1.gd): same logic as a competent player.
 func _autopilot(delta: float) -> void:
 	var h := model.altitude()
+	if model.has_upper and model.stage == 1 and model.fuel <= 1.0:
+		_do_separate()
+	if model.fairing_on and h >= 95000.0:
+		_do_fairing()
 	var o := model.orbit()
 	var ap := minf(float(o["ap"]), 1.0e9)
 	var thr := 1.0 if model.q < 0.8 * FlightModel.Q_LIMIT else 0.55
@@ -437,7 +460,17 @@ func _simulate(delta: float) -> void:
 	if model.crashed and model.time > 2.0:
 		_fail("M1_FAIL_CRASH", true)
 		return
-	if model.fuel <= 0.0 and not model.in_stable_orbit():
+	if model.stage == 2 and model.engine_on and not _ign_fx:
+		_ign_fx = true
+		flight.ignite_stage2()
+		hud.big(tr("STG_BIG_IGNITE"), UIKit.C_ACCENT)
+		Sfx.play("ignite", -4.0)
+	if model.has_upper and model.stage == 1 and model.fuel <= 0.0 and not model.in_stable_orbit():
+		_stuck_t += delta
+		if _stuck_t > 30.0:
+			_fail("STG_FAIL_STUCK", false)
+			return
+	if model.fuel <= 0.0 and not model.in_stable_orbit() and not (model.has_upper and model.stage == 1):
 		var o := model.orbit()
 		if not bool(o["bound"]) or float(o["pe"]) < FlightModel.SAFE_PE:
 			_fuel_out_t += delta
@@ -464,6 +497,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if state != S.FLIGHT:
 		return
 	match event.keycode:
+		KEY_G:
+			_do_separate()
+		KEY_F:
+			_do_fairing()
 		KEY_T:
 			assist = not assist
 		KEY_1:
@@ -490,6 +527,10 @@ func _update_hint() -> void:
 		hud.set_hint("M1_HINT_ORBIT", UIKit.C_GOOD)
 	elif model.q > 0.85 * FlightModel.Q_LIMIT:
 		hud.set_hint("M1_HINT_MAXQ", UIKit.C_BAD)
+	elif model.has_upper and model.stage == 1 and model.fuel <= 0.0:
+		hud.set_hint("STG_HINT_EMPTY", UIKit.C_BAD)
+	elif model.has_upper and model.stage == 1 and model.fuel_fraction() < 0.1:
+		hud.set_hint("STG_HINT_SEP", UIKit.C_ORANGE)
 	elif model.fuel_fraction() < 0.08 and model.fuel > 0.0:
 		hud.set_hint("M1_HINT_FUEL", UIKit.C_WARN)
 	elif bool(o["bound"]) and ap >= 110000.0 and pe < FlightModel.SAFE_PE:
@@ -537,6 +578,42 @@ func _update_fx() -> void:
 
 
 # ------------------------------------------------------------------ deploy --
+## STAGE SEPARATION (G / panel button): drops the spent first stage. Consequences are real - see FlightModel.
+func _do_separate() -> void:
+	if state != S.FLIGHT or inspecting or not model.has_upper or model.stage != 1:
+		return
+	var r := model.separate_stage()
+	if not bool(r.get("ok", false)):
+		return
+	flight.separate_stage()
+	Sfx.play("clang", -2.0)
+	Sfx.play("whoosh", -6.0)
+	hud.big(tr("STG_BIG_SEP"), UIKit.C_ORANGE)
+	_override_hint = "STG_NOW_COAST"
+	_override_t = 3.0
+	if float(r["shock"]) > 1.0:
+		_override_hint = "STG_SEP_SHOCK"
+		_override_t = 5.0
+	_ign_fx = false
+
+
+## FAIRING SEPARATION (F / panel button): sheds the nose fairing mass; in dense air the exposed payload is damaged.
+func _do_fairing() -> void:
+	if state != S.FLIGHT or inspecting or not model.fairing_on:
+		return
+	var r := model.jettison_fairing()
+	if not bool(r.get("ok", false)):
+		return
+	flight.jettison_fairing()
+	Sfx.play("clang", -6.0)
+	if float(r["damage"]) > 0.0:
+		_override_hint = "STG_FAIRING_EARLY"
+		_override_t = 5.0
+		Sfx.play("hit", -8.0)
+	else:
+		hud.big(tr("STG_BIG_FAIRING"), UIKit.C_ACCENT)
+
+
 func _try_deploy() -> void:
 	if state != S.FLIGHT:
 		return
@@ -544,6 +621,9 @@ func _try_deploy() -> void:
 		_override_hint = "M1_DEPLOY_DENIED"
 		_override_t = 3.0
 		return
+	if model.fairing_on:
+		fairing_late = true             # still wearing the fairing: its dead mass was carried all the way
+		model.jettison_fairing()
 	state = S.DEPLOY
 	model.throttle = 0.0
 	Sfx.loop_stop("rumble")
@@ -577,6 +657,8 @@ func _downlink() -> void:
 
 func _succeed() -> void:
 	state = S.ENDED
+	if stage_panel != null:
+		stage_panel.visible = false
 	var fuel_left := model.fuel_fraction()
 	var o := model.orbit()
 	var sr := M1Design.science_result(design, float(o["ap"]), float(o["pe"]))
@@ -586,7 +668,9 @@ func _succeed() -> void:
 		stars += 1
 	if science >= 0.95 and model.integrity >= 80.0:
 		stars += 1
-	var score := stars * 1000 + int(science * 1500.0) + int(fuel_left * 300.0) + int(model.integrity * 2.0) \
+	var stage_pen := int(maxf(model.sep_waste, 0.0) * 400.0) + int(minf(model.dead_mass_time, 20.0) * 5.0) \
+		+ (120 if fairing_late else 0) + (150 if model.fairing_early else 0)
+	var score := stars * 1000 + int(science * 1500.0) + int(fuel_left * 300.0) + int(model.integrity * 2.0) - stage_pen \
 		+ maxi(M1Parts.BUDGET - int(stats["cost"]), 0) * 4
 	hud.set_hint("M1_HINT_SUCCESS", UIKit.C_GOOD)
 	var goal_id := str(design["goal"])
@@ -601,6 +685,7 @@ func _succeed() -> void:
 		["R_DATA_F", "%d%%" % int(float(sr["data_f"]) * 100.0)],
 		["R_DATA_GB", "%.1f GB" % float(sr["data_gb"])],
 		["R_FUEL_LEFT", "%d%%" % int(fuel_left * 100.0)],
+		["R_STAGING", _staging_text()],
 		["R_RELIABILITY", "%d%%%s" % [int(float(stats["rel"]) * 100.0), " (!)" if anomaly_seen else ""]],
 		["R_INTEGRITY", "%d%%" % int(model.integrity)],
 		["R_COST", "%s / %s" % [Units.money(int(stats["cost"])), Units.money(M1Parts.BUDGET)]],
@@ -608,6 +693,7 @@ func _succeed() -> void:
 	]
 	# four-segment evaluation
 	var launch_r := clampf(model.integrity / 100.0 * 0.6 + (0.4 if model.max_q_seen < 0.9 * FlightModel.Q_LIMIT else 0.2), 0.0, 1.0)
+	launch_r *= 1.0 - clampf(maxf(model.sep_waste, 0.0) * 0.5, 0.0, 0.3)
 	var space_r := (float(sr["orbit_q"]) + float(sr["power_f"]) + float(sr["batt_f"])) / 3.0
 	var segments: Array = [["SEG_LAUNCH", launch_r], ["SEG_SPACE", space_r], ["SEG_GROUND", float(sr["data_f"])],
 		["SEG_USER", clampf(science, 0.0, 1.0)]]
@@ -625,6 +711,16 @@ func _succeed() -> void:
 		tips.append("TIP_FUEL")
 	if model.max_q_seen > 0.9 * FlightModel.Q_LIMIT:
 		tips.append("TIP_MAXQ")
+	if model.has_upper and model.sep_waste > 0.12:
+		tips.append("TIP_SEP_EARLY")
+	if model.dead_mass_time > 8.0:
+		tips.append("TIP_SEP_LATE")
+	if model.fairing_early:
+		tips.append("TIP_FAIRING_EARLY")
+	if fairing_late:
+		tips.append("TIP_FAIRING_LATE")
+	if not model.has_upper and model.fuel_fraction() < 0.1:
+		tips.append("TIP_TRY_UPPER")
 	if anomaly_seen:
 		tips.append("TIP_REL")
 	if tips.is_empty():
@@ -635,10 +731,25 @@ func _succeed() -> void:
 	finish(true, stars, score, res, "M1_WIN_REASON", 1.0, extra)
 
 
+func _staging_text() -> String:
+	var parts: Array[String] = []
+	if model.has_upper:
+		parts.append(tr("R_STG_WASTE") % int(maxf(model.sep_waste, 0.0) * 100.0))
+	if model.fairing_early:
+		parts.append(tr("R_STG_FAIR_EARLY"))
+	elif fairing_late:
+		parts.append(tr("R_STG_FAIR_LATE"))
+	elif model.fairing_time >= 0.0:
+		parts.append(tr("R_STG_FAIR_OK"))
+	return ", ".join(parts) if not parts.is_empty() else "-"
+
+
 func _fail(reason_key: String, boom: bool) -> void:
 	if state == S.ENDED:
 		return
 	state = S.ENDED
+	if stage_panel != null:
+		stage_panel.visible = false
 	Sfx.stop_all_loops()
 	if boom:
 		flight.explode()
