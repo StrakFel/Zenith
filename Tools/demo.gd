@@ -67,7 +67,7 @@ func _run() -> void:
 	await _wait(6.0)
 
 	# ---------------------------------------------------------- mission 2
-	root.get_node("Router").start_mission("m2_spacewalk")
+	root.get_node("Router").start_mission("m2_lunar")
 	m = await _wait_scene("mission2")
 	await _wait(4.0)
 	m.dev_skip_briefing()

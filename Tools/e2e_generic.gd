@@ -28,6 +28,8 @@ func _process(_d: float) -> bool:
 	if _stage == 0:
 		_stage = 1
 		m.dev_skip_briefing()
+		if m.has_method("dev_quick_start"):
+			m.dev_quick_start()
 		m.dev_autopilot = true
 		return false
 	if _frames % 300 == 0 and "world" in m and m.world != null:

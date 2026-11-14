@@ -5,7 +5,7 @@ extends SceneTree
 ##   Godot --headless --fixed-fps 60 --path . --script res://Tools/briefing_test.gd --quit-after 40000
 
 const MISSIONS := ["mission1", "mission2", "mission3"]
-const IDS := ["m1_launch", "m2_spacewalk", "m3_docking"]
+const IDS := ["m1_launch", "m2_lunar", "m3_docking"]
 const SIZES := [Vector2i(1280, 720), Vector2i(1024, 576), Vector2i(800, 450)]
 
 var _fail := 0

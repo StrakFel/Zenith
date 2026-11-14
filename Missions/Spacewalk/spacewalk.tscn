@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://Missions/Spacewalk/spacewalk_mission.gd" id="1"]
+
+[node name="Spacewalk" type="Node"]
+script = ExtResource("1")

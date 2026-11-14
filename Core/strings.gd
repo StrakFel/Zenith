@@ -13,6 +13,7 @@ static func all() -> Dictionary:
 	d.merge(StringsM3.DATA)
 	d.merge(StringsSci.DATA, true)
 	d.merge(StringsCam.DATA, true)
+	d.merge(StringsLunar.DATA, true)
 	return d
 
 

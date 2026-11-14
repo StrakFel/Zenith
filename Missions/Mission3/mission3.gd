@@ -1,4 +1,4 @@
-﻿extends MissionBase
+extends MissionBase
 ## Mission 3 - ISS Docking. Rotate, translate and brake with RCS thrusters; line the
 ## nose up with the port and touch it slowly enough, straight enough and centred enough.
 
@@ -18,6 +18,17 @@ var inspecting := false
 var cam_hint: CameraHint
 var _stranded_t := 0.0
 var _done := false
+var design: Dictionary = {}
+var st: Dictionary = {}
+var design_view: IssDesignView
+var review: DesignReview
+var _hud_root: Control
+var _big: Label
+var _launching := false
+var _lt := 0.0
+var _last_cd := -1
+const LAUNCH_COUNTDOWN := 3.0
+const LAUNCH_ASCENT := 5.0
 
 
 func _init() -> void:
@@ -27,7 +38,7 @@ func _init() -> void:
 func _briefing_data() -> Dictionary:
 	return {
 		"title": "M3_TITLE",
-		"objectives": ["M3_OBJ_1", "M3_OBJ_2", "M3_OBJ_3", "M3_OBJ_4", "M3_SCI_NOTE"],
+		"objectives": ["ISS_OBJ_0", "M3_OBJ_1", "M3_OBJ_2", "M3_OBJ_3", "M3_OBJ_4", "M3_SCI_NOTE"],
 		"controls": [
 			["A D", "M3_CTRL_ROT"],
 			["W S", "M3_CTRL_FWD"],
@@ -65,6 +76,13 @@ func _build_hud() -> void:
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	hud_layer.add_child(root)
+	_hud_root = root
+	_big = UIKit.label("", 64, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
+	_big.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	_big.offset_left = -300
+	_big.offset_right = 300
+	_big.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(_big)
 	var p := UIKit.panel()
 	p.position = Vector2(16, 16)
 	root.add_child(p)
@@ -123,15 +141,91 @@ func _build_hud() -> void:
 
 
 func _on_mission_start() -> void:
-	started = true
 	view.orbit.engaged_changed.connect(func(on: bool):
-		inspecting = on
-		cam_hint.set_inspect(on)
-		if on:
+		inspecting = on and started
+		cam_hint.set_inspect(inspecting)
+		if inspecting:
 			Sfx.stop_all_loops())
+	_open_design(IssDesign.default_design())
+
+
+func _open_design(d: Dictionary) -> void:
+	design_view = IssDesignView.new()
+	design_view.design = d.duplicate()
+	hud_layer.add_child(design_view)
+	design_view.design_done.connect(_on_design_done)
+
+
+func _on_design_done(d: Dictionary) -> void:
+	design = d
+	st = IssDesign.stats(design)
+	if design_view != null:
+		design_view.queue_free()
+		design_view = null
+	review = DesignReview.new()
+	hud_layer.add_child(review)
+	review.setup_reqs(IssDesign.requirements(design), IssDesign.can_launch(design))
+	review.back_requested.connect(func():
+		review.queue_free()
+		_open_design(design))
+	review.launch_approved.connect(func():
+		review.queue_free()
+		_start_launch())
+
+
+func _start_launch() -> void:
+	if not IssDesign.can_launch(design):
+		return
+	_launching = true
+	_lt = 0.0
+	_last_cd = -1
+
+
+func _update_launch(delta: float) -> void:
+	_lt += delta
+	var tleft := LAUNCH_COUNTDOWN - _lt
+	if tleft > 0.0:
+		var n := int(ceil(tleft))
+		if n != _last_cd:
+			_last_cd = n
+			_big.text = str(n)
+			Sfx.play("tick")
+		return
+	if _last_cd != 0:
+		_last_cd = 0
+		_big.text = tr("M1_LIFTOFF")
+		Sfx.play("go")
+	Sfx.loop("rumble", -16.0)
+	if _lt - LAUNCH_COUNTDOWN >= LAUNCH_ASCENT:
+		Sfx.loop_stop("rumble")
+		_big.text = ""
+		_begin_docking()
+
+
+func _begin_docking() -> void:
+	_launching = false
+	world.fuel = DockingWorld.FUEL_MAX * float(st["fuel"])
+	started = true
+
+
+## Test helper: skip the lab (default or given design) and go straight to the docking phase.
+func dev_quick_start(d: Dictionary = {}) -> void:
+	design = IssDesign.default_design() if d.is_empty() else d
+	st = IssDesign.stats(design)
+	if design_view != null:
+		design_view.queue_free()
+		design_view = null
+	_begin_docking()
+
+
+func _fuel_r() -> float:
+	return world.fuel / (DockingWorld.FUEL_MAX * maxf(float(st.get("fuel", 1.0)), 0.01))
 
 
 func _process(delta: float) -> void:
+	if _launching and not ended:
+		_update_launch(delta)
+		return
 	if not started or ended:
 		return
 	if inspecting:
@@ -278,7 +372,7 @@ func _on_docked() -> void:
 	_done = true
 	var tip := world.nose_tip()
 	var stars := 1
-	if world.fuel / DockingWorld.FUEL_MAX >= 0.4:
+	if _fuel_r() >= 0.4:
 		stars += 1
 	if _viability(tip) >= 0.9:
 		stars += 1
@@ -287,7 +381,7 @@ func _on_docked() -> void:
 
 ## The cargo (crystal-growth experiment) is fragile: fast or off-centre contact damages it.
 func _viability(tip: Vector2) -> float:
-	var shock := clampf(1.0 - maxf(0.0, world.contact_speed - 0.1) / 0.4, 0.2, 1.0)
+	var shock := clampf(1.0 - maxf(0.0, world.contact_speed - 0.1) / (0.4 / maxf(float(st.get("fragile", 1.0)), 0.1)), 0.2, 1.0)
 	var centre := 1.0 - clampf(absf(tip.y) / DockingWorld.TOL_LAT, 0.0, 1.0) * 0.2
 	return shock * centre
 
@@ -303,7 +397,7 @@ func _on_failed(reason: String) -> void:
 
 func _end(success: bool, reason: String, stars: int = 0, tip: Vector2 = Vector2.ZERO) -> void:
 	var stats: Array = [
-		["R_FUEL_LEFT", "%d%%" % int(world.fuel / DockingWorld.FUEL_MAX * 100.0)],
+		["R_FUEL_LEFT", "%d%%" % int(clampf(_fuel_r(), 0.0, 1.0) * 100.0)],
 		["M3_CLOSING", Units.ms(world.contact_speed, 2)],
 		["M3_OFFSET", Units.m1(tip.y, true) if success else "-"],
 		["M3_ANGLE", Units.deg(rad_to_deg(world.angle_error()))],
@@ -316,7 +410,10 @@ func _end(success: bool, reason: String, stars: int = 0, tip: Vector2 = Vector2.
 		stats.append(["R_SHOCK", Units.ms(world.contact_speed, 2)])
 		score = stars * 1000 + int(world.fuel * 12.0) + int(via * 800.0)
 		stats.append(["R_SCORE", str(score)])
-		var fuel_r := world.fuel / DockingWorld.FUEL_MAX
+		var fuel_r := _fuel_r()
+		var sci := clampf(via * float(st.get("sci", 1.0)), 0.0, 1.3)
+		stats.append(["R_BUDGET_USED", "$%d / $%d" % [int(st.get("cost", 0)), IssDesign.BUDGET]])
+		var launch_r := clampf(1.0 - maxf(float(st.get("mass", 0.0)) / maxf(float(st.get("cap", 1.0)), 1.0) - 0.75, 0.0) * 1.6, 0.4, 1.0)
 		var tips: Array = []
 		if world.contact_speed > 0.15:
 			tips.append("M3_TIP_FAST")
@@ -324,14 +421,18 @@ func _end(success: bool, reason: String, stars: int = 0, tip: Vector2 = Vector2.
 			tips.append("M3_TIP_OFFSET")
 		if fuel_r < 0.25:
 			tips.append("M3_TIP_FUEL")
+		if float(st.get("fragile", 1.0)) > 1.0 and world.contact_speed > 0.1:
+			tips.append("ISS_TIP_FRAGILE")
+		if float(st.get("fuel", 1.0)) < 0.75 and fuel_r < 0.3:
+			tips.append("ISS_TIP_RCS")
 		if tips.is_empty():
 			tips.append("M3_TIP_GOOD")
 		extra = {
-			"segments": [["SEG_SPACE", clampf(0.4 + fuel_r, 0.0, 1.0)],
+			"segments": [["SEG_LAUNCH", launch_r], ["SEG_SPACE", clampf(0.4 + fuel_r, 0.0, 1.0)],
 				["SEG_GROUND", clampf(1.0 - absf(tip.y) / DockingWorld.TOL_LAT * 0.5, 0.0, 1.0)],
 				["SEG_USER", via]],
-			"science": via, "science_note": "M3_SCI_NOTE", "tips": tips,
-			"user": "M3_USER_%d" % M1Design.science_tier(via),
+			"science": sci, "science_note": "M3_SCI_NOTE", "tips": tips,
+			"user": "M3_USER_%d" % M1Design.science_tier(sci),
 		}
 	finish(success, stars, score, stats, reason, 1.4, extra)
 

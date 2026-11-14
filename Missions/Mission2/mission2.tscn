@@ -2,5 +2,5 @@
 
 [ext_resource type="Script" path="res://Missions/Mission2/mission2.gd" id="1"]
 
-[node name="Mission2" type="Node"]
+[node name="LunarExpedition" type="Node"]
 script = ExtResource("1")

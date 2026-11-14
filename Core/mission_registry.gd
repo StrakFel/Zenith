@@ -6,7 +6,7 @@ extends RefCounted
 const MISSIONS: Array[Dictionary] = [
 	{"id": "m1_launch", "title": "M1_TITLE", "desc": "M1_DESC",
 		"scene": "res://Missions/Mission1/mission1.tscn", "available": true, "difficulty": 2, "skill": "MS_M1_SKILL"},
-	{"id": "m2_spacewalk", "title": "M2_TITLE", "desc": "M2_DESC",
+	{"id": "m2_lunar", "title": "M2_TITLE", "desc": "M2_DESC",
 		"scene": "res://Missions/Mission2/mission2.tscn", "available": true, "difficulty": 3, "skill": "MS_M2_SKILL"},
 	{"id": "m3_docking", "title": "M3_TITLE", "desc": "M3_DESC",
 		"scene": "res://Missions/Mission3/mission3.tscn", "available": true, "difficulty": 4, "skill": "MS_M3_SKILL"},

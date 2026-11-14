@@ -262,24 +262,48 @@ func _run() -> void:
 	m = await _wait_scene("mission2")
 	_check(current_scene.scene_file_path.contains("mission2"), "Next mission opens Mission 2")
 
-	# ============================================================ MISSION 2
+	# ============================================================ MISSION 2 (Lunar Expedition)
 	_check(await _click_text("BTN_START"), "M2: CLICK Start mission")
+	await _frames(40)
+	_check(m.state == m.S.DESIGN and m.design_view != null, "M2: mission design lab is open")
+	_check(await _click_text("LUN_CONTINUE"), "M2: CLICK Continue to verification")
+	await _frames(40)
+	_check(m.state == m.S.REVIEW, "M2: verification (design review) window is open")
+	_check(await _click_text("REV_LAUNCH"), "M2: CLICK Approve and launch")
+	await _frames(40)
+	_check(m.state == m.S.LAUNCH, "M2: launch sequence started")
+	_check(await _wait_state(m, m.S.TRANSFER, 1500), "M2: launch finished, transfer planning open")
+	m._tli_slider.value = LunarDesign.ideal_tli_dv()
+	await _frames(5)
+	_check(m.tli_dv > 3100.0 and LunarDesign.tli_outcome(m.tli_dv) == 0, "M2: planner shows a clean-intercept burn")
+	_check(await _click_text("LUN_TLI_EXEC"), "M2: CLICK Execute burn")
+	_check(await _wait_state(m, m.S.DESCENT, 1500), "M2: Moon intercepted, descent started")
 	await _frames(60)
-	_check(m.started, "M2: mission running")
-	await _frames(60)
-	await _check_inspect_vehicle(m, "M2")
-	await _test_pause(m, "M2")
-	var ok2 := await _fly_m2(m)
-	_check(ok2, "M2: satellite repaired and astronaut back at the airlock (keyboard pilot)")
+	await _check_inspect_lunar(m)
+	await _test_pause_lunar(m)
+	var ok2 := await _fly_lunar_descent(m)
+	_check(ok2 and m.lm.landed, "M2: lander touched down safely (keyboard pilot, %s)" % m.lm.outcome)
+	await _frames(30)
+	_check(m.state == m.S.SURFACE, "M2: surface operations started")
+	var ok2b := await _drive_rover(m)
+	_check(ok2b and m.r_samples == 3, "M2: rover collected %d / 3 samples (keyboard, E key)" % m.r_samples)
 	_release_all()
-	_check(_gs.is_completed("m2_spacewalk"), "M2: progress saved")
+	await _key(KEY_ENTER)
+	_check(await _wait_result(m, 1500), "M2: data uplinked, results window shown")
+	_check(_gs.is_completed("m2_lunar"), "M2: progress saved")
 	_check(await _click_text("BTN_NEXT"), "M2 results: CLICK Next mission")
 	m = await _wait_scene("mission3")
 	_check(current_scene.scene_file_path.contains("mission3"), "Next mission opens Mission 3")
 
 	# ============================================================ MISSION 3
 	_check(await _click_text("BTN_START"), "M3: CLICK Start mission")
-	await _frames(60)
+	await _frames(40)
+	_check(m.design_view != null, "M3: cargo design lab is open")
+	_check(await _click_text("LUN_CONTINUE"), "M3: CLICK Continue to verification")
+	await _frames(40)
+	_check(await _click_text("REV_LAUNCH"), "M3: CLICK Approve and launch")
+	await _frames(1000)
+	_check(m.started, "M3: launch done, docking phase running")
 	await _fly_m3_some(m, 900)
 	await _check_inspect_vehicle(m, "M3")
 	var ok3 := await _fly_m3(m)
@@ -294,7 +318,7 @@ func _run() -> void:
 	var cfg := ConfigFile.new()
 	var err := cfg.load("user://zenith_save.cfg")
 	var saved: Dictionary = JSON.parse_string(str(cfg.get_value("progress", "data", "{}")))
-	_check(err == OK and saved.has("m1_launch") and saved.has("m2_spacewalk") and saved.has("m3_docking"), "save file on disk contains all 3 missions")
+	_check(err == OK and saved.has("m1_launch") and saved.has("m2_lunar") and saved.has("m3_docking"), "save file on disk contains all 3 missions")
 
 	# ============================================================ LOSS / RETRY / PLAY
 	await _test_loss_retry()
@@ -445,18 +469,79 @@ func _keys_for_dir(dir: Vector2) -> void:
 	_hold(KEY_W, dir.y < -0.35)
 
 
-func _fly_m2(m: Node) -> bool:
+func _wait_state(m: Node, st: int, limit: int) -> bool:
+	for i in limit:
+		if m.state == st:
+			return true
+		await process_frame
+	return m.state == st
+
+
+func _check_inspect_lunar(m: Node) -> void:
+	var o: OrbitCameraController = m.moon.orbit
+	var cam: Camera3D = m.moon.camera
+	await _drag(MOUSE_BUTTON_LEFT, Vector2(200, 0))
+	_check(not o.engaged, "M2: LMB drag does nothing during the landing until C is pressed")
+	await _key(KEY_C)
+	await _frames(5)
+	_check(m.inspecting, "M2: C turns the free camera ON")
+	var p1: Vector2 = m.lm.pos
+	var v1: Vector2 = m.lm.vel
+	var f1: float = m.lm.fuel
+	var camp := cam.global_position
+	await _drag(MOUSE_BUTTON_LEFT, Vector2(300, -70))
+	await _frames(30)
+	_check(cam.global_position.distance_to(camp) > 1.0, "M2 inspect: real mouse moved the camera")
+	_check(m.lm.pos == p1 and m.lm.vel == v1 and m.lm.fuel == f1, "M2 inspect: lander position / velocity / fuel UNCHANGED")
+	await _key(KEY_R)
+	await _frames(40)
+	_check(not m.inspecting, "M2: R leaves the free camera and resumes")
+
+
+func _test_pause_lunar(m: Node) -> void:
+	await _key(KEY_ESCAPE)
+	await _frames(5)
+	_check(paused and m.pause_menu.visible, "M2: ESC opens the pause menu")
+	var p0: Vector2 = m.lm.pos
+	await _frames(30)
+	_check(m.lm.pos == p0, "M2: game is frozen while paused")
+	_check(await _click_text("BTN_RESUME"), "M2: CLICK Resume")
+	await _frames(5)
+	_check(not paused and not m.pause_menu.visible, "M2: pause closed")
+
+
+func _fly_lunar_descent(m: Node) -> bool:
 	var frames := 0
-	while frames < 40000 and not _has_result(m):
+	while frames < 30000 and m.state == m.S.DESCENT:
 		frames += 1
 		await process_frame
 		if m.inspecting:
 			continue
-		var dir: Vector2 = m._autopilot_dir()
-		_keys_for_dir(dir)
-		_hold(KEY_SHIFT, m._ap_fine)
+		var c: Vector2 = m._lander_autopilot()
+		_hold(KEY_W, c.x > m.lm.throttle + 0.04)
+		_hold(KEY_S, c.x < m.lm.throttle - 0.04)
+		_hold(KEY_D, c.y > 0.3)
+		_hold(KEY_A, c.y < -0.3)
 	_release_all()
-	return await _wait_result(m, 400)
+	return m.state != m.S.DESCENT and m.lm.landed
+
+
+func _drive_rover(m: Node) -> bool:
+	var frames := 0
+	while frames < 30000 and m.state == m.S.SURFACE and m.r_samples < 3:
+		frames += 1
+		await process_frame
+		var c: Vector2 = m._rover_autopilot(false)
+		_hold(KEY_W, c.x > 0.3)
+		_hold(KEY_S, c.x < -0.3)
+		_hold(KEY_D, c.y > 0.3)
+		_hold(KEY_A, c.y < -0.3)
+		var i: int = m._next_poi()
+		if i >= 0 and m._sampling < 0 and m.r_pos.distance_to(m.moon.pois[i]) < 4.0 and absf(m.r_speed) < 0.4:
+			_release_all()
+			await _key(KEY_E)
+	_release_all()
+	return m.r_samples == 3
 
 
 func _fly_m3_some(m: Node, n: int) -> void:
@@ -490,14 +575,19 @@ func _fly_m3(m: Node) -> bool:
 
 # -------------------------------------------------------------- loss + restart -----
 func _test_loss_retry() -> void:
-	# --- Mission 2 loss: run out of oxygen, then Retry
+	# --- Mission 2 loss: wrong trans-lunar burn (miss the Moon), then Retry
 	_router.go_to("res://Missions/Mission2/mission2.tscn")
 	var m := await _wait_scene("mission2")
 	await _click_text("BTN_START")
-	await _frames(60)
-	m.world.o2 = 0.2
-	var got := await _wait_result(m, 900)
-	_check(got, "M2 loss: running out of oxygen shows the result window")
+	await _frames(40)
+	m.dev_auto_design()
+	m._on_launch()
+	await _wait_state(m, m.S.TRANSFER, 1500)
+	m._tli_slider.value = 3010.0
+	await _frames(5)
+	await _click_text("LUN_TLI_EXEC")
+	var got := await _wait_result(m, 1500)
+	_check(got, "M2 loss: a wrong trans-lunar burn (miss) shows the result window")
 	var title_fail := false
 	for c in m.overlay.get_children():
 		if c.has_method("show_result"):

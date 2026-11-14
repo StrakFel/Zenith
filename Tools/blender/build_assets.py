@@ -617,6 +617,86 @@ def zenith_station():
     export("zenith_station")
 
 
+def link(name, p0, p1, r, material, seg=12):
+    """Cylinder strut between two points."""
+    from mathutils import Vector
+    a = Vector(p0)
+    b = Vector(p1)
+    d = b - a
+    bpy.ops.mesh.primitive_cylinder_add(vertices=seg, radius=r, depth=d.length, location=(a + b) / 2.0)
+    o = bpy.context.active_object
+    o.name = name
+    o.rotation_mode = "QUATERNION"
+    o.rotation_quaternion = Vector((0, 0, 1)).rotation_difference(d)
+    bpy.ops.object.transform_apply(rotation=True)
+    return _finish(o, material, 0.0, 50.0)
+
+
+def lander():
+    """Lunar lander: origin = ground contact point under the centre, +Z up."""
+    m = new_asset()
+    # descent stage (gold foil) + engine
+    cyl("descent", 1.9, 1.1, (0, 0, 1.55), m["gold"], 8, bevel=0.08)
+    cyl("descent_ring", 1.95, 0.18, (0, 0, 2.1), m["dark"], 8, bevel=0.03)
+    lathe("engine_bell", [(0.15, 0.55), (0.42, 0.8), (0.62, 1.05), (0.7, 1.25)], m["steel"], 32, loc=(0, 0, 0.0))
+    # ascent stage (white) with windows
+    cyl("ascent", 1.35, 1.5, (0, 0, 3.05), m["white"], 8, bevel=0.1)
+    sphere("window_a", 0.28, (1.2, -0.35, 3.3), m["glass"], (0.4, 1, 1))
+    sphere("window_b", 0.28, (1.2, 0.35, 3.3), m["glass"], (0.4, 1, 1))
+    cyl("ascent_cap", 1.0, 0.3, (0, 0, 3.95), m["gray"], 8, bevel=0.05)
+    # landing legs + footpads
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            link("leg", (sx * 1.2, sy * 1.2, 1.9), (sx * 3.0, sy * 3.0, 0.15), 0.1, m["steel"])
+            link("brace", (sx * 1.7, sy * 1.7, 1.2), (sx * 2.4, sy * 2.4, 0.9), 0.06, m["gray"])
+            cyl("foot", 0.5, 0.14, (sx * 3.0, sy * 3.0, 0.07), m["steel"], 24, bevel=0.03)
+    # antenna dish, solar panels, RCS, status light
+    link("mast", (0.4, 0, 3.8), (0.4, 0, 4.7), 0.06, m["steel"])
+    dish = lathe("dish", [(0.05, 0.0), (0.4, 0.1), (0.8, 0.35)], m["white"], 32, loc=(0.4, 0, 4.7))
+    for sy in (-1, 1):
+        box("panel_%d" % sy, (2.2, 0.08, 1.0), (0, sy * 2.7, 3.2), m["solar"])
+        link("panel_arm_%d" % sy, (0, sy * 1.3, 3.2), (0, sy * 1.6, 3.2), 0.05, m["steel"])
+    for k in range(4):
+        a = k * math.pi / 2 + math.pi / 4
+        box("rcs_%d" % k, (0.4, 0.3, 0.3), (math.cos(a) * 1.45, math.sin(a) * 1.45, 3.7), m["dark"], 0.04, (0, 0, a))
+    sphere("beacon", 0.15, (0, 0, 4.1), m["orange"])
+    box("ladder", (0.08, 0.5, 1.8), (1.9, 0, 1.0), m["gray"])
+    export("lander")
+
+
+def rover():
+    """Six-wheel rover: origin = ground contact (centre), forward = +X, +Z up."""
+    m = new_asset()
+    box("chassis", (1.8, 1.1, 0.4), (0, 0, 0.62), m["white"], 0.08)
+    box("belly", (1.6, 0.9, 0.2), (0, 0, 0.42), m["dark"], 0.04)
+    for sx in (-0.65, 0.0, 0.65):
+        for sy in (-0.72, 0.72):
+            cyl("wheel", 0.3, 0.24, (sx, sy, 0.3), m["dark"], 24, axis="Y", bevel=0.02)
+            cyl("hub", 0.12, 0.26, (sx, sy, 0.3), m["gray"], 16, axis="Y")
+            link("susp", (sx, sy * 0.78, 0.3), (sx * 0.8, sy * 0.45, 0.58), 0.04, m["steel"])
+    # tilted solar panel
+    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(-0.15, 0, 0.95), rotation=(0, -0.22, 0))
+    pan = bpy.context.active_object
+    pan.name = "solar"
+    pan.scale = (1.5, 1.0, 0.05)
+    bpy.ops.object.transform_apply(scale=True)
+    _finish(pan, m["solar"], 0.0, 40.0)
+    box("panel_frame", (1.56, 1.06, 0.03), (-0.15, 0, 0.9), m["frame"], 0.02, (0, -0.22, 0))
+    # mast with camera head + dish
+    link("mast", (0.55, 0, 0.8), (0.55, 0, 1.55), 0.04, m["steel"])
+    box("cam_head", (0.28, 0.4, 0.18), (0.55, 0, 1.62), m["dark"], 0.03)
+    sphere("lens_l", 0.05, (0.7, -0.1, 1.62), m["glass"])
+    sphere("lens_r", 0.05, (0.7, 0.1, 1.62), m["glass"])
+    link("dish_arm", (-0.6, 0.5, 0.82), (-0.6, 0.5, 1.2), 0.03, m["steel"])
+    lathe("dish", [(0.03, 0.0), (0.18, 0.05), (0.32, 0.16)], m["white"], 24, loc=(-0.6, 0.5, 1.2))
+    # instrument arm with drill
+    link("arm_a", (0.9, -0.3, 0.6), (1.2, -0.3, 0.45), 0.04, m["steel"])
+    link("arm_b", (1.2, -0.3, 0.45), (1.35, -0.3, 0.12), 0.035, m["gray"])
+    cyl("drill", 0.06, 0.25, (1.35, -0.3, 0.05), m["orange"], 12)
+    sphere("status", 0.05, (0.9, 0.35, 0.86), m["blue"])
+    export("rover")
+
+
 if __name__ == "__main__":
     for k in ("std", "aero"):
         nose(k)
@@ -631,6 +711,8 @@ if __name__ == "__main__":
     ship()
     astronaut()
     zenith_station()
+    lander()
+    rover()
     print("ALL ASSETS DONE")
 
 

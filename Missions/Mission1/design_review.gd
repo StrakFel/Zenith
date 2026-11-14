@@ -8,12 +8,16 @@ signal launch_approved
 
 
 func setup(design: Dictionary, rocket: Dictionary) -> void:
+	setup_reqs(M1Design.requirements(design, rocket), M1Parts.can_launch(rocket))
+
+
+## Generic verification table: reqs = [{id, key, level 0..2, value, hint}], can = launch allowed.
+func setup_reqs(reqs: Array, can: bool) -> void:
 	build(860.0, 0.72)
 	header.add_child(UIKit.label("REV_TITLE", 30, Color.WHITE))
 	var sub := UIKit.label("REV_SUB", 14, UIKit.C_MUTED)
 	sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	header.add_child(sub)
-	var reqs := M1Design.requirements(design, rocket)
 	var grid := GridContainer.new()
 	grid.columns = 4
 	grid.add_theme_constant_override("h_separation", 16)
@@ -45,7 +49,6 @@ func setup(design: Dictionary, rocket: Dictionary) -> void:
 	verdict.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	verdict.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_child(verdict)
-	var can := M1Parts.can_launch(rocket)
 	if not can:
 		var blocked := UIKit.label("REV_BLOCKED", 15, UIKit.C_BAD)
 		blocked.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

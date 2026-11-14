@@ -122,27 +122,30 @@ func _build_groups() -> void:
 	rk.set_thrust(0.55, 0.0, Vector3.ZERO)
 	orbit.add_focusable(rk, 30.0, 95.0)
 	orbit.add_obstacle(rk, 5.0, 28.0)
-	# --- 2: damaged satellite + astronaut
-	var sat := (load("res://Assets/Models/satellite.glb") as PackedScene).instantiate() as Node3D
-	_groups[1].add_child(sat)
-	var wing := sat.find_child("wing_L", true, false)
-	if wing is Node3D:
-		(wing as Node3D).rotation.z = 0.55
-	var dish := sat.find_child("dish", true, false)
-	if dish is Node3D:
-		(dish as Node3D).rotation.z = -0.75
-	for n in ["inst_mag", "inst_spec"]:
-		var nn := sat.find_child(n, true, false)
-		if nn is Node3D:
-			(nn as Node3D).visible = false
-	_astro = (load("res://Assets/Models/astronaut.glb") as PackedScene).instantiate() as Node3D
-	_astro.scale = Vector3.ONE * 1.6
-	_astro.position = Vector3(-17, -5, 12)
-	_groups[1].add_child(_astro)
-	orbit.add_focusable(sat, 16.0, 62.0)
-	orbit.add_focusable(_astro, 3.0, 12.0)
-	orbit.add_obstacle(sat, 9.0)
-	orbit.add_obstacle(_astro, 2.0)
+	# --- 2: the Moon with lander and rover (lunar expedition)
+	var mo := MeshInstance3D.new()
+	var mos := SphereMesh.new()
+	mos.radius = 15.0
+	mos.height = 30.0
+	mos.radial_segments = 64
+	mos.rings = 32
+	mo.mesh = mos
+	var mmat := ShaderMaterial.new()
+	mmat.shader = load("res://Core3D/shaders/moon_globe.gdshader")
+	mo.material_override = mmat
+	_groups[1].add_child(mo)
+	var lan := (load("res://Assets/Models/lander.glb") as PackedScene).instantiate() as Node3D
+	lan.scale = Vector3.ONE * 1.4
+	lan.position = Vector3(0, 15.0, 0)
+	_groups[1].add_child(lan)
+	var rov := (load("res://Assets/Models/rover.glb") as PackedScene).instantiate() as Node3D
+	rov.scale = Vector3.ONE * 1.6
+	rov.position = Vector3(7.5, 13.2, 0)
+	rov.rotation = Vector3(0, 0.6, -0.5)
+	_groups[1].add_child(rov)
+	orbit.add_focusable(mo, 16.0, 62.0)
+	orbit.add_focusable(lan, 5.0, 24.0)
+	orbit.add_obstacle(mo, 15.5)
 	# --- 3: station + spacecraft
 	var st := (load("res://Assets/Models/station.glb") as PackedScene).instantiate() as Node3D
 	st.scale = Vector3.ONE * 0.5

@@ -8,8 +8,8 @@ Godot 4.7 (GL Compatibility), GDScript only, all art is drawn procedurally (no e
 | # | Mission | Status |
 |---|---------|--------|
 | 1 | Rocket Assembly & Launch - drag-and-drop build (mass, fuel, thrust, TWR, delta-v, cost), countdown, gravity-turn flight with Max-Q, orbit insertion, satellite deployment | playable |
-| 2 | Spacewalk - zero-g inertia, limited thruster gas and oxygen, repair a satellite, return to the airlock slowly | prototype (playable) |
-| 3 | ISS Docking - RCS translation + rotation, approach corridor, tolerance indicators, hard-dock check | prototype (playable) |
+| 2 | Lunar Expedition - mission design lab (site, launcher, lander, rover, instrument, power, antenna), verification, launch, trans-lunar burn planner, powered landing, rover science, data uplink | playable |
+| 3 | ISS Expedition - cargo/experiment design lab, verification, launch, then RCS docking with the station (fuel and fragile cargo come from the design) | playable |
 | 4-5 | locked placeholders | registered in `Core/mission_registry.gd` |
 
 ## Project layout
@@ -32,8 +32,10 @@ and models the four segments: **Launch** (rocket), **Space** (satellite power/ba
 (downlink in one contact window per orbit) and **Users** (what the data is worth). The maths lives in
 `Missions/Mission1/m1_design.gd` (goals, instruments, solar/battery/antenna, requirements, science result) and is
 deliberately simplified (fixed eclipse and contact time, no orbit decay, linear altitude-window penalty) - it teaches
-trade-offs, it is not GMAT-grade analysis. Mission 2 ties repairs to the satellite's science output, Mission 3 delivers a
-fragile experiment (gentle docking = better data).
+trade-offs, it is not GMAT-grade analysis. Mission 2 (`Missions/Mission2/lunar_design.gd`, `lander_model.gd`) uses real Earth/Moon constants for the trans-lunar
+ellipse and a 2-D powered-descent lander; its lunar-orbit insertion is a fixed delta-v cost and the surface day is shortened
+(not GMAT-grade). Mission 3 delivers a fragile experiment (gentle docking = better data). The old spacewalk mechanic is kept
+as `Missions/Spacewalk/spacewalk.tscn` (EVA training, not in the campaign list).
 
 ## Menus and camera
 * **Play** launches the next available mission straight away (Mission 1 with no progress; the last mission when
@@ -89,7 +91,8 @@ Missions 2 and 3 list their controls in the briefing screen.
 Godot --headless --path . --script res://Tools/sim_test.gd
 # full scene run with an autopilot (assembly -> flight -> result -> saved progress)
 Godot --headless --fixed-fps 60 --path . --script res://Tools/e2e_m1.gd -- kestrel/l/aero 1
-Godot --headless --fixed-fps 60 --path . --script res://Tools/e2e_generic.gd -- res://Missions/Mission2/mission2.tscn 1
+Godot --headless --fixed-fps 60 --path . --script res://Tools/e2e_generic.gd -- res://Missions/Mission3/mission3.tscn 1
+Godot --headless --fixed-fps 60 --path . --script res://Tools/e2e_m2.gd -- site=pole,tank=l 8   # lunar expedition autopilot
 # screenshot of any scene (non-headless): Tools/run_shot.ps1
 ```
 Note: the e2e tests write to the normal save file; use *Settings -> Reset progress* afterwards.

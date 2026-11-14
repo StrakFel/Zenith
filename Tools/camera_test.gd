@@ -1,4 +1,4 @@
-﻿extends SceneTree
+extends SceneTree
 ## Headless functional test: menu buttons / Play logic / mission select / orbit camera input in the
 ## menus, the assembly screen and inspect mode of all three missions (vehicle must not move).
 ##   Godot --headless --fixed-fps 60 --path . --script res://Tools/camera_test.gd
@@ -91,7 +91,7 @@ func _run() -> void:
 	router.play()
 	m = await _wait_scene("mission2")
 	_check(m.scene_file_path.contains("mission2"), "Play after Mission 1 starts Mission 2")
-	gs.record_result("m2_spacewalk", 2, 1000)
+	gs.record_result("m2_lunar", 2, 1000)
 	router.play()
 	m = await _wait_scene("mission3")
 	_check(m.scene_file_path.contains("mission3"), "Play after Mission 2 starts Mission 3")
@@ -103,12 +103,12 @@ func _run() -> void:
 	# ---------------------------------------------------------------- unlock rules
 	gs.progress.clear()
 	var reg = load("res://Core/mission_registry.gd")   # loaded lazily: it uses autoloads
-	_check(reg.is_unlocked("m1_launch") and not reg.is_unlocked("m2_spacewalk") and not reg.is_unlocked("m3_docking"),
+	_check(reg.is_unlocked("m1_launch") and not reg.is_unlocked("m2_lunar") and not reg.is_unlocked("m3_docking"),
 		"missions unlock sequentially (only M1 at the start)")
 	_check(not reg.is_unlocked("m4_lunar") and not reg.is_unlocked("m5_deep"), "missions 4-5 are locked (coming soon)")
 	gs.record_result("m1_launch", 1, 500)
-	_check(reg.is_unlocked("m2_spacewalk") and not reg.is_unlocked("m3_docking"), "completing M1 unlocks M2 only")
-	gs.record_result("m2_spacewalk", 1, 500)
+	_check(reg.is_unlocked("m2_lunar") and not reg.is_unlocked("m3_docking"), "completing M1 unlocks M2 only")
+	gs.record_result("m2_lunar", 1, 500)
 	_check(reg.is_unlocked("m3_docking") and reg.is_unlocked("m1_launch"), "M3 unlocked, completed missions stay replayable")
 
 	# ---------------------------------------------------------------- mission select screen
@@ -208,10 +208,11 @@ func _run() -> void:
 	_check(absf(r_before - m.model.r) > 0.05, "simulation resumes after inspect mode")
 
 	# ---------------------------------------------------------------- mission 2 / 3 inspect mode
-	for entry in [["mission2", "m2_spacewalk"], ["mission3", "m3_docking"]]:
+	for entry in [["mission3", "m3_docking"]]:
 		router.start_mission(entry[1])
 		m = await _wait_scene(entry[0])
 		m.dev_skip_briefing()
+		m.dev_quick_start()
 		await _frames(30)
 		var w = m.world
 		var p0: Vector2 = w.pos
