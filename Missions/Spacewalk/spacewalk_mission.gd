@@ -251,14 +251,129 @@ func _process(delta: float) -> void:
 
 
 ## Simple test pilot: fly toward the next goal, slow down when close.
+## Test pilot: shortest route round the solid parts (visibility graph over the inflated corners of the hulls).
+## A target that lies inside a part (the dish) is approached from the nearest free side.
+func _route_next(from: Vector2, goal: Vector2) -> Vector2:
+	var pad := SpacewalkWorld.ASTRO_R + 0.9
+	var rects: Array[Rect2] = []
+	for r in world.hulls():
+		rects.append(r.grow(pad))
+	var cands: Array[Vector2] = []
+	var holder := -1
+	for i in rects.size():
+		if rects[i].grow(-0.05).has_point(goal):
+			holder = i
+	if holder < 0:
+		cands.append(goal)
+	else:
+		var r: Rect2 = rects[holder]
+		for c in [Vector2(goal.x, r.position.y - 0.1), Vector2(goal.x, r.end.y + 0.1), Vector2(r.position.x - 0.1, goal.y), Vector2(r.end.x + 0.1, goal.y)]:
+			var free := goal.distance_to(c) <= SpacewalkWorld.TARGET_R - 0.4
+			for q in rects:
+				if q.grow(-0.05).has_point(c):
+					free = false
+			if free:
+				cands.append(c)
+		if cands.is_empty():
+			cands.append(goal)
+	var best_cost := INF
+	var best_wp := goal
+	for c in cands:
+		var res := _plan(from, c, rects)
+		if float(res[0]) < best_cost:
+			best_cost = float(res[0])
+			best_wp = res[1]
+	return best_wp
+
+
+## Returns [path length, first waypoint].
+func _plan(from: Vector2, goal: Vector2, rects: Array[Rect2]) -> Array:
+	if _seg_clear(from, goal, rects):
+		return [from.distance_to(goal), goal]
+	var nodes: Array[Vector2] = [from, goal]
+	for r in rects:
+		for c in [r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)]:
+			var inside := false
+			for q in rects:
+				if q.grow(-0.05).has_point(c):
+					inside = true
+					break
+			if not inside:
+				nodes.append(c)
+	var n := nodes.size()
+	var dist: Array[float] = []
+	var prev: Array[int] = []
+	var done: Array[bool] = []
+	for i in n:
+		dist.append(INF)
+		prev.append(-1)
+		done.append(false)
+	dist[0] = 0.0
+	for _k in n:
+		var u := -1
+		for i in n:
+			if not done[i] and (u < 0 or dist[i] < dist[u]):
+				u = i
+		if u < 0 or dist[u] == INF:
+			break
+		done[u] = true
+		if u == 1:
+			break
+		for v in n:
+			if done[v]:
+				continue
+			var d: float = dist[u] + nodes[u].distance_to(nodes[v])
+			if d < dist[v] and _seg_clear(nodes[u], nodes[v], rects):
+				dist[v] = d
+				prev[v] = u
+	if prev[1] < 0:
+		return [INF, goal]
+	var cur := 1
+	while prev[cur] != 0 and prev[cur] >= 0:
+		cur = prev[cur]
+	return [dist[1], nodes[cur]]
+
+
+func _seg_clear(a: Vector2, b: Vector2, rects: Array[Rect2]) -> bool:
+	for r0 in rects:
+		var r := r0.grow(-0.05)            # touching an edge (corner to corner along a side) is allowed
+		var d := b - a
+		var t0 := 0.0
+		var t1 := 1.0
+		var hit := true
+		for ax in 2:
+			var da: float = d[ax]
+			var lo: float = r.position[ax]
+			var hi: float = r.end[ax]
+			if absf(da) < 0.00001:
+				if a[ax] < lo or a[ax] > hi:
+					hit = false
+					break
+			else:
+				var ta := (lo - a[ax]) / da
+				var tb := (hi - a[ax]) / da
+				t0 = maxf(t0, minf(ta, tb))
+				t1 = minf(t1, maxf(ta, tb))
+				if t0 > t1:
+					hit = false
+					break
+		if hit:
+			return false
+	return true
+
+
+var _ap_goal := Vector2(1e9, 1e9)
+var _ap_wp := Vector2.ZERO
+
+
 func _autopilot_dir() -> Vector2:
-	var tgt := world.next_target()
-	# the battery sits under the satellite body: route around its left side
-	if tgt == world.target_world(2) and world.pos.y < SpacewalkWorld.SAT.y + 4.0 \
-			and world.pos.x > SpacewalkWorld.SAT.x - 11.0:
-		tgt = Vector2(SpacewalkWorld.SAT.x - 13.0, SpacewalkWorld.SAT.y + 9.0)
-	elif tgt == SpacewalkWorld.HATCH and world.pos.y > SpacewalkWorld.SAT.y + 6.0 and world.pos.x > SpacewalkWorld.SAT.x - 12.0:
-		tgt = Vector2(SpacewalkWorld.SAT.x - 14.0, SpacewalkWorld.SAT.y + 10.0)
+	var goal := world.next_target()
+	# commit to a waypoint until it is reached (re-planning every frame makes the pilot dither and burn fuel)
+	var passing := _ap_wp.distance_to(goal) > 3.2        # an intermediate waypoint (not the final approach): fly through it at speed
+	if goal != _ap_goal or world.pos.distance_to(_ap_wp) < (2.2 if passing else 1.3):
+		_ap_goal = goal
+		_ap_wp = _route_next(world.pos, goal)
+	var tgt := _ap_wp
 	var to := tgt - world.pos
 	var d := to.length()
 	var v := world.vel
@@ -267,6 +382,8 @@ func _autopilot_dir() -> Vector2:
 		want_speed = clampf(d * 0.12, 0.0, 0.6)
 	if d < 1.6:
 		want_speed = 0.0
+	if passing and _ap_wp.distance_to(goal) > 3.2:
+		want_speed = 2.3
 	var want := to.normalized() * want_speed if d > 0.01 else Vector2.ZERO
 	var diff := want - v
 	_ap_fine = d < 14.0

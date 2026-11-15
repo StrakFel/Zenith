@@ -1,4 +1,4 @@
-﻿class_name SpacewalkView3D
+class_name SpacewalkView3D
 extends Node3D
 ## 3D presentation of the spacewalk. The gameplay (inertia, fuel, repairs, collisions) is
 ## simulated by SpacewalkWorld in the XY plane; this node renders it: Blender-built station,
@@ -50,6 +50,14 @@ func setup(w: SpacewalkWorld) -> void:
 	sat = (load("res://Assets/Models/satellite.glb") as PackedScene).instantiate()
 	sat.position = p3(SpacewalkWorld.SAT)
 	add_child(sat)
+	# the solar wings are shortened to 40 % so that the astronaut can fly round them (the collision boxes match)
+	for wn in ["wing_L", "wing_R"]:
+		var wm := sat.find_child(wn, true, false) as MeshInstance3D
+		if wm != null and wm.mesh != null:
+			var bb := wm.mesh.get_aabb()
+			var hinge := bb.end.x if wn == "wing_L" else bb.position.x
+			wm.scale.x = 0.4
+			wm.position.x += hinge * 0.6
 	_wing = sat.find_child("wing_L", true, false)
 	_dish = sat.find_child("dish", true, false)
 	_led = sat.find_child("battery_led", true, false) as MeshInstance3D

@@ -358,6 +358,7 @@ func _on_landed() -> void:
 		var a := (load("res://Assets/Models/astronaut.glb") as PackedScene).instantiate() as Node3D
 		moon.add_child(a)
 		OrbitStage3D.fit_height(a, 1.8)
+		a.set_meta("foot", OrbitStage3D.foot_offset(a))      # the model origin is at the torso: lift it so the feet touch the ground
 		a.position = lander_view.position + Vector3(1.6, 1.4, 1.9)
 		_astro.append(a)
 	_set_hint(tr("M5S_EVA_OUT"), UIKit.C_ACCENT)
@@ -378,7 +379,7 @@ func _update_eva(delta: float) -> void:
 		for i in _astro.size():
 			var kk := clampf(k * 1.4 - 0.25 * i, 0.0, 1.0)
 			var target_xz := (r_pos if i == 0 else lander_xz + Vector2(6.0, 5.0))
-			var tp := _ground_at(target_xz)
+			var tp := _ground_at(target_xz) + Vector3(0, float(_astro[i].get_meta("foot", 0.9)), 0)
 			_astro[i].position = hatch.lerp(tp, smoothstep(0.0, 1.0, kk)) + Vector3(0, absf(sin(kk * 9.0)) * 0.12, 0)
 			_astro[i].look_at(_astro[i].position + (tp - hatch).normalized() * Vector3(1, 0, 1) + Vector3(0.001, 0, 0.001), Vector3.UP)
 		var p := lander_view.position
@@ -388,7 +389,7 @@ func _update_eva(delta: float) -> void:
 			var seat := _astro[0]
 			seat.get_parent().remove_child(seat)
 			rover.add_child(seat)
-			seat.position = Vector3(0.05, 0.98, 0)       # the astronaut stands on the rover deck (the model origin is at its torso)
+			seat.position = Vector3(0.05, (1.0 + float(seat.get_meta("foot", 0.9))) / 1.6, 0)       # feet on the rover deck (about 1 m up)
 			seat.rotation = Vector3.ZERO
 			seat.scale = seat.scale / 1.6          # the rover node is scaled 1.6
 			_seat = seat
@@ -898,7 +899,7 @@ func _stage_chute(delta: float) -> void:
 		os.main_chute.position = Vector3(1.4 * sin(_rs_t * 0.7), 34.0, 0.9 * cos(_rs_t * 0.6))
 		os.drogue.visible = false
 	os.cap.rotation = Vector3(0.05 * sin(_rs_t * 1.2), 0, 0.07 * sin(_rs_t * 0.9)) * (1.0 if _chute > 0 else 4.0)
-	_orbit_cam(delta, 78.0 if _chute == 2 else (44.0 if _chute == 1 else 24.0), 62.0 + 10.0 * sin(_rs_t * 0.3), 12.0 if _chute > 0 else 6.0, Vector3(0, 20.0 if _chute == 2 else (8.0 if _chute == 1 else 5.0), 0), 46.0)
+	_orbit_cam(delta, 78.0 if _chute == 2 else (44.0 if _chute == 1 else 24.0), 62.0 + 10.0 * sin(_rs_t * 0.3), 22.0 if _chute > 0 else 8.0, Vector3(0, 20.0 if _chute == 2 else (8.0 if _chute == 1 else 5.0), 0), 46.0)
 	(_vals["alt"] as Label).text = "%.0f m" % _alt
 	(_vals["vel"] as Label).text = "%d m/s" % int(_speed)
 	var ck := "M5S_CHUTE_NONE" if _chute == 0 else ("M5S_CHUTE_DROGUE" if _chute == 1 else "M5S_CHUTE_MAIN")
@@ -939,10 +940,12 @@ func _stage_chute(delta: float) -> void:
 func _stage_splash(delta: float) -> void:
 	os.set_altitude(0.5 + 0.35 * sin(_rs_t * 1.8), 0.02)
 	os.cap.rotation = Vector3(0.1 * sin(_rs_t * 1.4), 0, 0.12 * sin(_rs_t * 1.1))
-	os.main_chute.scale.y = lerpf(os.main_chute.scale.y, 0.15, 1.0 - exp(-delta * 1.2))
-	os.main_chute.position.y = lerpf(os.main_chute.position.y, 4.0, 1.0 - exp(-delta * 0.8))
-	os.main_chute.position.x += delta * 1.2
-	_orbit_cam(delta, 40.0 + _rs_t * 2.0, 45.0 + _rs_t * 7.0, 14.0 + _rs_t, Vector3(0, 10.0, 0), 46.0)
+	# the released canopy drifts away and settles on the water, the capsule stays afloat
+	os.main_chute.scale.y = lerpf(os.main_chute.scale.y, 0.12, 1.0 - exp(-delta * 1.2))
+	os.main_chute.position.y = lerpf(os.main_chute.position.y, 0.6, 1.0 - exp(-delta * 0.7))
+	os.main_chute.position.x += delta * 3.5
+	os.main_chute.position.z -= delta * 1.5
+	_orbit_cam(delta, 22.0 + _rs_t * 1.5, 30.0 + _rs_t * 6.0, 8.0 + _rs_t * 0.6, Vector3(0, 1.4, 0), 46.0)
 	if _rs_t >= 5.2:
 		_rs = ""
 		ret["ok"] = true

@@ -34,6 +34,7 @@ var plasma: Node3D
 var drogue: Node3D
 var main_chute: Node3D
 var _lines: MeshInstance3D
+var ocean: MeshInstance3D
 var _lines_mesh: ImmediateMesh
 var _t := 0.0
 
@@ -97,6 +98,12 @@ static func fit_height(node: Node3D, height: float) -> void:
 	var box := _aabb(node, Transform3D.IDENTITY)
 	if box.size.y > 0.001:
 		node.scale = Vector3.ONE * (height / box.size.y)
+
+
+## Distance (m) from the model origin down to the soles of its feet, at the model's current scale (the astronaut origin is at the torso).
+static func foot_offset(node: Node3D) -> float:
+	var box := _aabb(node, Transform3D.IDENTITY)
+	return -box.position.y * node.scale.y
 
 
 static func _aabb(n: Node, xf: Transform3D) -> AABB:
@@ -275,6 +282,31 @@ func _build_entry_scene() -> void:
 	entry_root.add_child(_lines)
 	drogue.visible = false
 	main_chute.visible = false
+	# the sea seen from low altitude (the planet shader is only good from high up): a big wavy ocean plane
+	var wn := FastNoiseLite.new()
+	wn.frequency = 0.02
+	wn.fractal_octaves = 3
+	var nt := NoiseTexture2D.new()
+	nt.noise = wn
+	nt.as_normal_map = true
+	nt.bump_strength = 6.0
+	nt.seamless = true
+	nt.width = 512
+	nt.height = 512
+	var om := StandardMaterial3D.new()
+	om.albedo_color = Color(0.02, 0.16, 0.34)
+	om.roughness = 0.34
+	om.metallic = 0.0
+	om.metallic_specular = 0.35
+	om.normal_enabled = true
+	om.normal_texture = nt
+	om.normal_scale = 0.8
+	om.uv1_scale = Vector3(3000, 3000, 1)
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(900_000.0, 900_000.0)
+	ocean = _mesh(entry_root, pm, om)
+	ocean.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	ocean.visible = false
 
 
 func _make_canopy(r: float, col: Color) -> Node3D:
@@ -327,6 +359,10 @@ func show_entry() -> void:
 ## Sets the capsule altitude over the sea (m).
 func set_altitude(h: float, theta: float = 0.0) -> void:
 	stage.set_flight(h, theta)
+	var low := h < 40_000.0                       # below ~40 km the sea is a real water surface, above it the globe is shown
+	ocean.visible = low
+	stage.planet_pivot.visible = not low
+	ocean.position = Vector3(0, -h - 0.45, 0)
 
 
 func cam(delta: float, pos: Vector3, look: Vector3, fov: float = 42.0) -> void:

@@ -80,10 +80,14 @@ func hulls() -> Array[Rect2]:
 		Rect2(-44.0, -7.0, 40.0, 14.0),            # main module
 		Rect2(-54.0, -4.0, 10.0, 8.0),             # aft module
 		Rect2(-8.0, -3.0, 4.0, 6.0),               # airlock
-		Rect2(-34.0, -31.0, 16.0, 22.0),           # upper array
-		Rect2(-34.0, 9.0, 16.0, 22.0),             # lower array
+		Rect2(-34.0, -31.0, 16.0, 24.0),           # upper array
+		Rect2(-34.0, 7.0, 16.0, 24.0),             # lower array
 		Rect2(SAT.x - 7.0, SAT.y - 5.0, 14.0, 10.0),   # satellite body
-		Rect2(SAT.x + 8.0, SAT.y - 1.6, 20.0, 3.2),    # right panel
+		Rect2(SAT.x + 7.0, SAT.y - 1.1, 9.0, 2.2),     # right panel (shortened in the 3D model to 40 %)
+		Rect2(SAT.x - 15.0, SAT.y - 1.1, 8.0, 2.2),    # left panel (the damaged wing, shortened to 40 %)
+		Rect2(SAT.x - 0.3, SAT.y - 10.5, 4.6, 5.5),    # dish
+		Rect2(SAT.x - 5.1, SAT.y - 14.9, 2.2, 9.9),    # magnetometer boom
+		Rect2(SAT.x + 1.5, SAT.y + 5.0, 5.0, 3.0),     # battery box
 	]
 
 
