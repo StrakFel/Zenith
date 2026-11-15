@@ -1,4 +1,4 @@
-﻿class_name SpaceStage
+class_name SpaceStage
 extends Node3D
 ## Reusable 3D world: procedural sky (atmosphere -> stars), sun, a huge procedural Earth
 ## with clouds + atmosphere glow, cinematic post-processing. The Earth is a real sphere
@@ -98,6 +98,7 @@ func _build() -> void:
 	planet.mesh = sm
 	planet_mat = ShaderMaterial.new()
 	planet_mat.shader = load("res://Core3D/shaders/planet.gdshader")
+	planet_mat.set_shader_parameter("ground_detail", 1.0)   # on the pad until set_flight() says otherwise
 	planet.material_override = planet_mat
 	planet.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	planet_pivot.add_child(planet)
@@ -126,7 +127,7 @@ func _build() -> void:
 	atmo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	planet_pivot.add_child(atmo)
 	ground_anchor = Node3D.new()
-	ground_anchor.position = Vector3(0, R, 0)
+	ground_anchor.position = Vector3(0, R + 2.0, 0)   # the pad stands 2 m above the globe surface (nothing z-fights, no globe shows through)
 	planet_pivot.add_child(ground_anchor)
 	set_flight(0.0, 0.0)
 

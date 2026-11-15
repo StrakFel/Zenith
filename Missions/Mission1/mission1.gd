@@ -60,6 +60,8 @@ var profile: Dictionary = {}
 var profile_id := ""
 var payload_lab: PayloadLab
 var _handoff_started := false
+var guided := true                   # Guided Launch: pitch profile + next-step coach (key H toggles)
+var _guide_override_t := 0.0
 
 
 func _init() -> void:
@@ -96,6 +98,8 @@ func _briefing_data() -> Dictionary:
 			["W S", "M1_CTRL_THROTTLE"],
 			["A D", "M1_CTRL_PITCH"],
 			["T", "M1_CTRL_ASSIST"],
+			["H", "M1_CTRL_GUIDE"],
+			["F1", "M1_CTRL_HELP"],
 			["Z X", "M1_CTRL_FULLCUT"],
 			["G", "M1_CTRL_STAGE"],
 			["F", "M1_CTRL_FAIRING"],
@@ -137,10 +141,12 @@ func _on_mission_start() -> void:
 		payload_lab.profile_id = profile_id
 		world_layer.add_child(payload_lab)
 		payload_lab.design_done.connect(_on_design_done)
+		payload_lab.back_requested.connect(func(): Router.go_to(Router.MISSION_SELECT))
 		return
 	design_view = MissionDesignView.new()
 	world_layer.add_child(design_view)
 	design_view.design_done.connect(_on_design_done)
+	design_view.back_requested.connect(func(): Router.go_to(Router.MISSION_SELECT))
 
 
 ## Step 1-2 finished: the satellite is designed, now design the rocket for it.
@@ -155,13 +161,40 @@ func _on_design_done(d: Dictionary) -> void:
 		design_view.queue_free()
 		design_view = null
 	state = S.ASSEMBLY
-	cam_hint.set_compact(true)
+	cam_hint.set_bottom(true, 6.0)       # camera help at the bottom, fades after 6 s (F1 shows it again)
 	assembly = AssemblyView.new()
 	assembly.scene3d = pad_scene
 	assembly.payload_mass = float(sat["mass"])
 	assembly.sat_cost = int(sat["cost"])
 	world_layer.add_child(assembly)
 	assembly.launch_requested.connect(_on_review_request)
+	assembly.back_requested.connect(_on_assembly_back)
+	assembly.missions_requested.connect(func(): Router.go_to(Router.MISSION_SELECT))
+
+
+## Back from the rocket designer: one step back to the payload / satellite design (which has its own way out to the missions).
+func _on_assembly_back() -> void:
+	if state != S.ASSEMBLY:
+		return
+	if assembly != null:
+		assembly.queue_free()
+		assembly = null
+	cam_hint.set_bottom(false)
+	state = S.DESIGN
+	if profile.is_empty():
+		design_view = MissionDesignView.new()
+		design_view.design = design.duplicate()
+		world_layer.add_child(design_view)
+		design_view.design_done.connect(_on_design_done)
+		design_view.back_requested.connect(func(): Router.go_to(Router.MISSION_SELECT))
+	else:
+		cam_hint.set_hud_corner(true)
+		payload_lab = PayloadLab.new()
+		payload_lab.profile_id = profile_id
+		payload_lab.design = design.duplicate()
+		world_layer.add_child(payload_lab)
+		payload_lab.design_done.connect(_on_design_done)
+		payload_lab.back_requested.connect(func(): Router.go_to(Router.MISSION_SELECT))
 
 
 ## Step 4: verification (design review) before launch.
@@ -318,6 +351,9 @@ func _on_launch(b: Dictionary) -> void:
 	hud_layer.add_child(hud)
 	hud.build()
 	flight.scene_design = design if profile.is_empty() else {}
+	guided = bool(GameState.settings["guided"])
+	_guide_burn = false
+	hud.set_guided(guided, _guide_pitch() if guided else NAN)
 	_ign_fx = false
 	_stuck_t = 0.0
 	fairing_late = false
@@ -328,6 +364,7 @@ func _on_launch(b: Dictionary) -> void:
 	stage_panel.boosters_requested.connect(_do_boosters)
 	stage_panel.fairing_requested.connect(_do_fairing)
 	cam_hint.set_compact(false)
+	cam_hint.set_bottom(false)
 	cam_hint.set_hud_corner(true)
 	cam_hint.set_mission_mode(true, 118.0)
 	state = S.COUNTDOWN
@@ -359,6 +396,8 @@ func _process(delta: float) -> void:
 			flight.sync()
 	if hud != null:
 		hud.refresh(model, warp, assist, model.time)
+		if guided and state == S.FLIGHT:
+			hud.set_guided(true, _guide_pitch())
 	_update_fx()
 
 
@@ -459,6 +498,16 @@ func _manual_input(delta: float) -> void:
 	if Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN):
 		thr_d -= 1.0
 	model.throttle = clampf(model.throttle + thr_d * 0.7 * delta, 0.0, 1.0)
+	if guided:
+		# the guide protects against the two classic mistakes: Max-Q and a too violent burnout
+		var cap := 1.0
+		if model.q > 0.8 * FlightModel.Q_LIMIT:
+			cap = 0.55
+		var h0 := model.altitude()
+		var ta_full := model.max_thrust * (model.isp_vac / model.isp_sl if h0 > 50000.0 else 1.0) / maxf(model.mass(), 1.0)
+		if ta_full > FlightModel.G_LIMIT * 0.95:
+			cap = minf(cap, FlightModel.G_LIMIT * 0.95 / ta_full)
+		model.throttle = minf(model.throttle, cap) if model.throttle > cap else model.throttle
 	if Input.is_physical_key_pressed(KEY_Z):
 		model.throttle = 1.0
 	if Input.is_physical_key_pressed(KEY_X):
@@ -468,7 +517,13 @@ func _manual_input(delta: float) -> void:
 		pitch_d += 1.0
 	if Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT):
 		pitch_d -= 1.0
-	if assist and pitch_d == 0.0 and model.speed() > 40.0:
+	_guide_override_t = maxf(_guide_override_t - delta, 0.0)
+	if pitch_d != 0.0:
+		_guide_override_t = 2.5               # the player steers: the guide steps aside for a moment
+	if guided and pitch_d == 0.0 and _guide_override_t <= 0.0:
+		_pitch_vel = 0.0
+		model.pitch = move_toward(model.pitch, _guide_pitch(), deg_to_rad(30.0) * delta)
+	elif assist and pitch_d == 0.0 and model.speed() > 40.0:
 		var target := model.prograde_pitch()
 		model.pitch = move_toward(model.pitch, clampf(target, 0.0, PI), deg_to_rad(40.0) * delta)
 	else:
@@ -476,6 +531,49 @@ func _manual_input(delta: float) -> void:
 		var sens := float(GameState.settings["sens"])
 		_pitch_vel = move_toward(_pitch_vel, pitch_d * deg_to_rad(26.0) * sens, deg_to_rad(110.0) * delta)
 		model.pitch = clampf(model.pitch + _pitch_vel * delta, deg_to_rad(-15.0), deg_to_rad(185.0))
+
+
+## Pitch (rad from vertical) the guide holds: vertical, gravity turn, level coast, circularising burn.
+func _guide_pitch() -> float:
+	var h := model.altitude()
+	var o := model.orbit()
+	var ap := minf(float(o["ap"]), 1.0e9)
+	if bool(o["bound"]) and ap >= _ap_target() * 0.97:
+		_guide_burn = true
+	var deg := 0.0
+	if _guide_burn:
+		deg = 90.0 + clampf(model.vr * 0.25, -10.0, 40.0) if (model.throttle > 0.05 and model.vr < 60.0) else 90.0
+	else:
+		deg = 0.0 if h < 600.0 else 90.0 * minf(1.0, pow((h - 600.0) / 60000.0, 0.5))
+	return deg_to_rad(deg)
+
+
+var _guide_burn := false
+
+
+## [translation key, step 1..7] of the guided-launch coach: only the NEXT thing to do, shown when it is relevant.
+func _guide_step() -> Array:
+	var h := model.altitude()
+	var o := model.orbit()
+	var ap := minf(float(o["ap"]), 1.0e9)
+	var pe := float(o["pe"])
+	if model.in_stable_orbit():
+		return ["GUIDE_ORBIT", 7]
+	if model.has_boosters and model.can_separate_boosters():
+		return ["GUIDE_BOOST", 3]
+	if model.has_upper and model.stage == 1 and model.can_separate_stage():
+		return ["GUIDE_STAGE", 3]
+	if model.fairing_on and model.can_jettison_fairing():
+		return ["GUIDE_FAIRING", 3]
+	if bool(o["bound"]) and ap >= _ap_target() * 0.97 and pe < FlightModel.SAFE_PE:
+		if model.throttle > 0.05 and model.vr > 40.0:
+			return ["GUIDE_CUT", 4]
+		if model.vr > 60.0:
+			return ["GUIDE_COAST", 5]
+		return ["GUIDE_BURN", 6]
+	if h < 600.0:
+		return ["GUIDE_LIFTOFF", 1]
+	return ["GUIDE_TURN", 2]
 
 
 func _simulate(delta: float) -> void:
@@ -547,6 +645,14 @@ func _simulate(delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey) or not event.pressed or event.echo:
 		return
+	if event.keycode == KEY_F1:
+		cam_hint.toggle_help()
+		return
+	if event.keycode == KEY_H and (state == S.FLIGHT or state == S.COUNTDOWN) and hud != null:
+		guided = not guided
+		GameState.set_setting("guided", guided)
+		hud.set_guided(guided, _guide_pitch() if guided else NAN)
+		return
 	# C = free camera (inspect mode) while the rocket is flying; the simulation is frozen
 	if event.keycode == KEY_C and (state == S.COUNTDOWN or state == S.FLIGHT or state == S.DEPLOY or state == S.DOWNLINK):
 		pad_scene.orbit.toggle_sticky()
@@ -590,6 +696,9 @@ func _update_hint() -> void:
 		hud.set_hint("STG_HINT_BOOST_EMPTY", UIKit.C_BAD)
 	elif model.g_load > 0.9 * FlightModel.G_LIMIT:
 		hud.set_hint("M1_HINT_GLOAD", UIKit.C_WARN)
+	elif guided:
+		var g := _guide_step()
+		hud.set_hint(tr("GUIDE_STEP") % int(g[1]) + " " + tr(str(g[0])), UIKit.C_ACCENT if int(g[1]) != 7 else UIKit.C_GOOD)
 	elif model.has_upper and model.stage == 1 and model.fuel <= 0.0:
 		hud.set_hint("STG_HINT_EMPTY", UIKit.C_BAD)
 	elif model.has_upper and model.stage == 1 and model.fuel_fraction() < 0.1:
@@ -648,6 +757,9 @@ func _update_fx() -> void:
 func _do_separate() -> void:
 	if state != S.FLIGHT or inspecting or not model.has_upper or model.stage != 1:
 		return
+	if not model.can_separate_stage():
+		_explain(model.why_not_stage())
+		return
 	var r := model.separate_stage()
 	if not bool(r.get("ok", false)):
 		return
@@ -663,10 +775,21 @@ func _do_separate() -> void:
 	_ign_fx = false
 
 
+## Short toast that says WHY an action is not available yet.
+func _explain(why: Array) -> void:
+	if str(why[0]) == "":
+		return
+	Sfx.play("beep", -14.0)
+	hud.notify(tr(str(why[0])) % int(why[1]), UIKit.C_WARN)
+
+
 ## BOOSTER SEPARATION (B / panel button): drops the strap-on boosters. Dropping them while they still burn wastes propellant,
 ## carrying them empty is dead weight, separating near Max-Q shocks the vehicle.
 func _do_boosters() -> void:
 	if state != S.FLIGHT or inspecting or not model.has_boosters:
+		return
+	if not model.can_separate_boosters():
+		_explain(model.why_not_boosters())
 		return
 	var r := model.separate_boosters()
 	if not bool(r.get("ok", false)):
@@ -683,6 +806,9 @@ func _do_boosters() -> void:
 ## FAIRING SEPARATION (F / panel button): sheds the nose fairing mass; in dense air the exposed payload is damaged.
 func _do_fairing() -> void:
 	if state != S.FLIGHT or inspecting or not model.fairing_on:
+		return
+	if not model.can_jettison_fairing():
+		_explain(model.why_not_fairing())
 		return
 	var r := model.jettison_fairing()
 	if not bool(r.get("ok", false)):

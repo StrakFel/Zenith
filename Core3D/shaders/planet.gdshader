@@ -6,6 +6,7 @@ uniform vec3 sun_dir = vec3(-0.55, 0.3, 0.78);
 uniform float ground_detail : hint_range(0.0, 1.0) = 0.0;
 uniform vec3 atm_col : source_color = vec3(0.25, 0.55, 1.0);
 uniform float haze = 0.0;
+uniform vec3 ground_tone : source_color = vec3(0.50, 0.40, 0.31);   // what the surface around the launch site looks like
 uniform vec3 haze_col : source_color = vec3(0.62, 0.78, 0.95);
 
 varying vec3 opos;
@@ -40,6 +41,8 @@ void fragment() {
 	float d2 = fbm(p * 6000.0);
 	alb *= mix(1.0, 0.72 + 0.5 * d1 + 0.25 * d2, ground_detail * land);
 	alb = mix(alb, alb * (0.8 + 0.4 * d1), ground_detail * (1.0 - land));
+	// near the launch site the whole visible surface is dry ground (no blue "ocean" disc around the pad, no blue horizon band)
+	alb = mix(alb, ground_tone * (0.82 + 0.3 * d1 + 0.12 * d2), ground_detail * 0.94);
 	float hz = 1.0 - exp(-length(VERTEX) * haze);
 	ALBEDO = mix(alb, haze_col * 0.6, hz * 0.85);
 	ROUGHNESS = mix(0.10, 0.88, land);

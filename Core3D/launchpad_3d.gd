@@ -23,6 +23,7 @@ func _ready() -> void:
 		var a := model.find_child("arm_%d" % i, true, false)
 		if a is Node3D:
 			arms.append(a)
+	_build_site()
 	# procedural ground disc under and around the pad
 	var ground := MeshInstance3D.new()
 	var pm := PlaneMesh.new()
@@ -53,6 +54,75 @@ func _ready() -> void:
 	_trench_light.omni_range = 90.0
 	add_child(_trench_light)
 	_build_particles()
+
+
+## Spaceport dressing: a wider apron, a crawler road to the assembly building, painted markings, a blockhouse and small
+## technical buildings, all standing on the ground (nothing floats).
+func _box(parent: Node3D, size: Vector3, pos: Vector3, col: Color, rough: float = 0.9, emit: float = 0.0) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = size
+	mi.mesh = bm
+	var m := StandardMaterial3D.new()
+	m.albedo_color = col
+	m.roughness = rough
+	if emit > 0.0:
+		m.emission_enabled = true
+		m.emission = col
+		m.emission_energy_multiplier = emit
+	mi.material_override = m
+	mi.position = pos + Vector3(0, size.y * 0.5, 0)
+	parent.add_child(mi)
+	return mi
+
+
+func _build_site() -> void:
+	var apron := model.find_child("apron", true, false)
+	if apron is Node3D:
+		(apron as Node3D).scale = Vector3(1.8, 1.0, 1.8)          # 150 m -> 270 m concrete apron
+	var site := Node3D.new()
+	add_child(site)
+	var concrete := Color(0.62, 0.6, 0.57)
+	var dark := Color(0.2, 0.21, 0.24)
+	var paint := Color(0.92, 0.92, 0.88)
+	var warn := Color(0.95, 0.7, 0.15)
+	# crawler road from the apron to the assembly building (direction of the VAB: -x, -z)
+	var road_dir := Vector3(-330.0, 0.0, 220.0).normalized()
+	var road := Node3D.new()
+	site.add_child(road)
+	road.position = Vector3(0, -0.5, 0)
+	var ang := atan2(road_dir.x, road_dir.z)
+	road.rotation.y = ang
+	_box(road, Vector3(16.0, 0.35, 420.0), Vector3(0, -0.2, 220.0), dark, 0.8)
+	for k in 28:
+		_box(road, Vector3(0.5, 0.05, 6.0), Vector3(0, 0.0, 135.0 + k * 11.0), paint, 0.7)        # centre dashes
+	for sx in [-1.0, 1.0]:
+		_box(road, Vector3(0.35, 0.05, 420.0), Vector3(sx * 7.6, 0.0, 220.0), warn, 0.7)              # edge lines
+	# painted markings on the apron: square guide line + landing-style numerals bars
+	for i in 4:
+		var r := Node3D.new()
+		site.add_child(r)
+		r.rotation.y = PI * 0.5 * float(i)
+		_box(r, Vector3(150.0, 0.06, 0.8), Vector3(0, 0.02, 52.0), paint, 0.6)
+		_box(r, Vector3(0.8, 0.06, 30.0), Vector3(40.0, 0.02, 36.0), warn, 0.6)
+	# blockhouse (control bunker) with a lit window, a service building and a generator shed
+	_box(site, Vector3(26.0, 8.0, 16.0), Vector3(-120.0, -0.5, 95.0), concrete, 0.95)
+	_box(site, Vector3(30.0, 0.8, 18.0), Vector3(-120.0, 7.5, 95.0), Color(0.45, 0.45, 0.47), 0.9)
+	_box(site, Vector3(14.0, 6.0, 10.0), Vector3(-30.0, -0.5, 96.0), Color(0.82, 0.83, 0.86), 0.8)
+	_box(site, Vector3(14.2, 0.8, 10.2), Vector3(-30.0, 4.6, 96.0), Color(0.15, 0.3, 0.55), 0.6)
+	_box(site, Vector3(10.0, 4.0, 7.0), Vector3(20.0, -0.5, 100.0), Color(0.7, 0.72, 0.75), 0.8)
+	# a few vehicles / crates and cable runs
+	for p in [Vector3(30, -0.5, 70), Vector3(36, -0.5, 74), Vector3(-4, -0.5, 84)]:
+		_box(site, Vector3(5.0, 2.2, 2.4), p, Color(0.9, 0.9, 0.92), 0.7)
+	for k in 6:
+		_box(site, Vector3(0.8, 0.5, 30.0), Vector3(14.0 + k * 1.6, -0.45, 70.0), Color(0.12, 0.12, 0.14), 0.9)
+	# the assembly building is a landmark: keep it, but make sure it visibly stands on the ground
+	var vab := model.find_child("vab", true, false)
+	# move the assembly building out of the hero camera's line of sight (it used to stand right behind the rocket)
+	for nm in ["vab", "vab_door", "vab_stripe"]:
+		var vn := model.find_child(nm, true, false)
+		if vn is Node3D:
+			(vn as Node3D).position += Vector3(-100.0, -0.6, 520.0)
 
 
 func _build_particles() -> void:

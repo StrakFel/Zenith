@@ -71,6 +71,18 @@ func setup(m: FlightModel) -> void:
 	_last_fairing = m.fairing_on
 
 
+func _why(w: Array) -> String:
+	return (tr(str(w[0])) % int(w[1])) if str(w[0]) != "" else ""
+
+
+## The most relevant "not yet" explanation (boosters, then stage, then fairing).
+func _first_why(m: FlightModel) -> String:
+	for w in [m.why_not_boosters(), m.why_not_stage(), m.why_not_fairing()]:
+		if str(w[0]) != "":
+			return _why(w)
+	return ""
+
+
 func _chip(key: String) -> Label:
 	var l := UIKit.label(key, 12, UIKit.C_MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	l.custom_minimum_size = Vector2(70, 22)
@@ -114,22 +126,27 @@ func refresh(delta: float) -> void:
 	_fuel_lbl.text = "%d%%" % int(m.fuel_fraction() * 100.0)
 	UIKit.set_bar_color(_fuel, UIKit.C_BAD if m.fuel_fraction() < 0.1 else UIKit.C_ORANGE)
 	_boost_btn.visible = m.has_boosters or m.b_waste >= 0.0
-	_boost_btn.disabled = not m.has_boosters
+	_boost_btn.disabled = not m.can_separate_boosters()
+	_boost_btn.tooltip_text = _why(m.why_not_boosters())
 	var b_now := m.has_boosters and m.b_fuel <= 0.0
 	_boost_btn.modulate = Color(1.0, 0.7 + 0.3 * pulse, 0.45, 1.0) if b_now else Color.WHITE
 	_boost_btn.text = "STG_BOOSTERS" if m.has_boosters else "STG_BOOSTERS_OFF"
-	var can_sep := m.has_upper and m.stage == 1
+	var can_sep := m.has_upper and m.stage == 1 and m.can_separate_stage()
+	var sep_possible := m.has_upper and m.stage == 1
 	_sep_btn.disabled = not can_sep
+	_sep_btn.tooltip_text = _why(m.why_not_stage())
 	_sep_btn.visible = m.has_upper
 	var sep_now := can_sep and m.fuel_fraction() < 0.1
 	_sep_btn.modulate = Color(1.0, 0.7 + 0.3 * pulse, 0.45, 1.0) if sep_now else Color.WHITE
-	_sep_btn.text = "STG_SEPARATE" if can_sep else "STG_SEPARATED"
-	_fair_btn.disabled = not m.fairing_on
-	var fair_ok := m.fairing_on and alt >= 85_000.0
+	_sep_btn.text = "STG_SEPARATE" if sep_possible else "STG_SEPARATED"
+	_fair_btn.disabled = not m.can_jettison_fairing()
+	_fair_btn.tooltip_text = _why(m.why_not_fairing())
+	var fair_ok := m.can_jettison_fairing()
 	_fair_btn.modulate = Color(0.6, 1.0, 0.7, 1.0) if fair_ok else Color.WHITE
 	_fair_btn.text = "STG_FAIRING" if m.fairing_on else "STG_FAIRING_OFF"
 	var key := "STG_HINT_IDLE"
 	var col := UIKit.C_MUTED
+	var why := _first_why(m)
 	if m.has_boosters and m.b_fuel <= 0.0:
 		key = "STG_HINT_BOOST_EMPTY"
 		col = UIKit.C_BAD
@@ -153,5 +170,9 @@ func refresh(delta: float) -> void:
 		key = "STG_HINT_FAIRING_WAIT"
 	elif not m.has_upper:
 		key = "STG_SINGLE"
+	if why != "" and key in ["STG_HINT_STAGE1", "STG_HINT_FAIRING_WAIT", "STG_HINT_BOOST", "STG_HINT_IDLE"]:
+		_hint.text = why
+		_hint.add_theme_color_override("font_color", UIKit.C_MUTED)
+		return
 	_hint.text = key
 	_hint.add_theme_color_override("font_color", col)

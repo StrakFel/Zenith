@@ -5,6 +5,7 @@ extends SceneTree
 ##   Godot --headless --fixed-fps 60 --path . --script res://Tools/briefing_test.gd --quit-after 40000
 
 const MISSIONS := ["mission1", "space_ops", "iss_launch", "constellation_launch", "moon_launch"]
+const SCENES := ["res://Missions/Mission1/mission1.tscn", "res://Missions/Mission2/space_ops.tscn", "res://Missions/Mission3/iss_launch.tscn", "res://Missions/Mission4/constellation_launch.tscn", "res://Missions/Mission5/moon_launch.tscn"]
 const IDS := ["m1_launch", "m2_space_ops", "m3_iss", "m4_constellation", "m5_moon"]
 const SIZES := [Vector2i(1280, 720), Vector2i(1024, 576), Vector2i(800, 450)]
 
@@ -42,7 +43,7 @@ func _load(i: int, locale: String, size: Vector2i) -> Node:
 	root.content_scale_size = size      # ... and layout space, so the visible rect equals `size`
 	_gs.progress.clear()
 	_gs.settings["unlock_all"] = true
-	_router.go_to("res://Missions/Mission%d/mission%d.tscn" % [i + 1, i + 1])
+	_router.go_to(SCENES[i])
 	var n := 0
 	while (current_scene == null or not current_scene.scene_file_path.contains(MISSIONS[i])) and n < 900:
 		await process_frame

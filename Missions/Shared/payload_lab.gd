@@ -4,6 +4,7 @@ extends Control
 ## Option groups and the live mass / cost readout come from LaunchProfiles.
 
 signal design_done(design: Dictionary)
+signal back_requested
 
 var profile_id := "m2"
 var design: Dictionary = {}
@@ -60,6 +61,11 @@ func _ready() -> void:
 	go.name = "ContinueButton"
 	go.pressed.connect(func(): design_done.emit(design.duplicate()))
 	outer.add_child(go)
+	var back := UIKit.button("BTN_BACK_MISSIONS", Vector2(0, 38))
+	back.name = "BackButton"
+	back.add_theme_font_size_override("font_size", 15)
+	back.pressed.connect(func(): back_requested.emit())
+	outer.add_child(back)
 	_build()
 	_refresh()
 

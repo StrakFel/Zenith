@@ -15,6 +15,7 @@ var settings: Dictionary = {
 	"fullscreen": false,
 	"shake": true,
 	"unlock_all": false,
+	"guided": true,    # Guided Launch: the flight guide shows the next step and holds the pitch profile
 	"sens": 1.0,   # control sensitivity multiplier (0.5 - 1.5)
 }
 ## mission_id -> {"completed": bool, "stars": int, "score": int}

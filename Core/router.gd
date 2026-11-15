@@ -1,4 +1,4 @@
-﻿extends CanvasLayer
+extends CanvasLayer
 ## Autoload "Router": scene changes with a fade.
 ##
 ## REPLACING THE TEMPORARY MENU: point MAIN_MENU (below) and the project's
@@ -56,6 +56,10 @@ func start_mission(id: String) -> void:
 ## progress). When every available mission is already completed it replays the last one.
 ## It never opens the mission list - that is what the "Missions" button is for.
 func play() -> void:
+	# Demo Mode (all missions unlocked): the player chooses which mission to start - nothing starts by surprise.
+	if bool(GameState.settings["unlock_all"]):
+		go_to(MISSION_SELECT)
+		return
 	var id := GameState.next_mission_id()
 	if id == "":
 		id = MissionRegistry.last_playable_id()

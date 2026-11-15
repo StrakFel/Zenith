@@ -10,6 +10,9 @@ var _top := -1.0
 var _right := false
 var _compact := false
 var _hud_corner := false
+var _bottom := false
+var _user_hidden := false
+var _fade: Tween
 
 
 ## top >= 0: centred at that y. top < 0: bottom corner (left, or right when `right`).
@@ -43,6 +46,21 @@ func setup(mission_mode: bool, top: float = -1.0, right: bool = false) -> void:
 
 
 func _layout() -> void:
+	if _bottom:
+		# assembly screens: between the side panels at the bottom, never over the part tabs / cards
+		_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+		_panel.offset_left = -290
+		_panel.offset_right = -82
+		_panel.offset_bottom = -12
+		_panel.offset_top = -12
+		_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
+		_banner.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+		_banner.offset_left = -300
+		_banner.offset_right = 300
+		_banner.offset_bottom = -64
+		_banner.offset_top = -64
+		_banner.grow_vertical = Control.GROW_DIRECTION_BEGIN
+		return
 	if _hud_corner:
 		# flight HUD: the hint sits at the top-right under the clock, the inspect banner at the bottom-centre
 		_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
@@ -87,6 +105,31 @@ func set_mission_mode(on: bool, top: float = -2.0) -> void:
 	if top > -1.5:
 		_top = top
 	_layout()
+
+
+## Bottom-centre placement + fade-out after `seconds` (F1 shows it again). Used on the assembly screens.
+func set_bottom(on: bool, seconds: float = 0.0) -> void:
+	_bottom = on
+	if on:
+		_label.custom_minimum_size.x = 188.0
+	_layout()
+	_panel.modulate.a = 1.0
+	_user_hidden = false
+	if _fade != null:
+		_fade.kill()
+	if on and seconds > 0.0:
+		_fade = create_tween()
+		_fade.tween_interval(seconds)
+		_fade.tween_property(_panel, "modulate:a", 0.0, 0.8)
+	_panel.visible = true
+
+
+## F1: show / hide the camera help by hand.
+func toggle_help() -> void:
+	if _fade != null:
+		_fade.kill()
+	_user_hidden = not _user_hidden and _panel.modulate.a > 0.5
+	_panel.modulate.a = 0.0 if _user_hidden else 1.0
 
 
 ## Flight-HUD placement (top-right under the clock / bottom-centre banner) - no overlap with the task panel.

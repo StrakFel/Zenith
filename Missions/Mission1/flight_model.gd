@@ -54,6 +54,8 @@ var sep_time := -1.0
 var fairing_time := -1.0
 var fairing_early := false
 var dead_mass_time := 0.0       # seconds an EMPTY stage was carried around
+const SEP_FUEL_MAX := 0.12       # a stage / booster may be separated once its propellant is below this share
+const FAIRING_MIN_ALT := 80_000.0  # the fairing may be jettisoned above this altitude (thin air)
 const CD_NO_FAIRING := 0.22     # extra drag of the exposed payload
 
 # state
@@ -169,6 +171,45 @@ func separate_boosters() -> Dictionary:
 	b_thrust_now = 0.0
 	integrity = maxf(integrity - shock, 1.0)
 	return {"ok": true, "waste": b_waste, "shock": shock}
+
+
+## ---- availability rules (used by the UI; the physics above stays unconditional)
+func can_separate_stage() -> bool:
+	return has_upper and stage == 1 and fuel_fraction() <= SEP_FUEL_MAX
+
+
+func can_separate_boosters() -> bool:
+	return has_boosters and (b_fuel / maxf(b_fuel_cap, 1.0)) <= SEP_FUEL_MAX
+
+
+func can_jettison_fairing() -> bool:
+	return fairing_on and altitude() >= FAIRING_MIN_ALT
+
+
+## [translation key, argument] explaining why an action is not available yet ("" key = available).
+func why_not_stage() -> Array:
+	if not has_upper or stage != 1:
+		return ["", 0]
+	if fuel_fraction() > SEP_FUEL_MAX:
+		return ["STG_WHY_STAGE", int(fuel_fraction() * 100.0)]
+	return ["", 0]
+
+
+func why_not_boosters() -> Array:
+	if not has_boosters:
+		return ["", 0]
+	var f := b_fuel / maxf(b_fuel_cap, 1.0)
+	if f > SEP_FUEL_MAX:
+		return ["STG_WHY_BOOST", int(f * 100.0)]
+	return ["", 0]
+
+
+func why_not_fairing() -> Array:
+	if not fairing_on:
+		return ["", 0]
+	if altitude() < FAIRING_MIN_ALT:
+		return ["STG_WHY_FAIRING", int(altitude() / 1000.0)]
+	return ["", 0]
 
 
 func current_cd() -> float:

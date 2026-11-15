@@ -79,6 +79,13 @@ func setup(design: Dictionary, sat: Dictionary, rk: Dictionary, rocket: Dictiona
 		row.add_child(bar)
 		row.add_child(UIKit.label("%d%%" % int(r * 100.0), 14, Color.WHITE))
 		body.add_child(row)
+	var gl := CheckButton.new()
+	gl.text = "SUM_GUIDED"
+	gl.name = "GuidedCheck"
+	gl.button_pressed = bool(GameState.settings["guided"])
+	gl.focus_mode = Control.FOCUS_NONE
+	gl.toggled.connect(func(on: bool): GameState.set_setting("guided", on))
+	body.add_child(gl)
 	var note := UIKit.label("SUM_NOTE", 12, UIKit.C_MUTED)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.add_child(note)

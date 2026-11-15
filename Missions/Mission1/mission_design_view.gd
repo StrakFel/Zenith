@@ -4,6 +4,7 @@ extends Control
 ## the satellite. Live trade-off panel: mass, power, eclipse battery, downlink, cost.
 
 signal design_done(design: Dictionary)
+signal back_requested
 
 var design: Dictionary = M1Design.default_design()
 
@@ -149,6 +150,11 @@ func _build_right() -> Control:
 	var go := UIKit.button("M1D_CONTINUE", Vector2(0, 52))
 	go.pressed.connect(func(): design_done.emit(design.duplicate()))
 	outer.add_child(go)
+	var back := UIKit.button("BTN_BACK_MISSIONS", Vector2(0, 38))
+	back.name = "BackButton"
+	back.add_theme_font_size_override("font_size", 15)
+	back.pressed.connect(func(): back_requested.emit())
+	outer.add_child(back)
 	return p
 
 

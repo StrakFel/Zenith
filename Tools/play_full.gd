@@ -158,6 +158,7 @@ func _run() -> void:
 	root.size = Vector2i(1280, 720)
 	_gs.progress.clear()
 	_gs.settings["unlock_all"] = false
+	_gs.settings["guided"] = false        # the keyboard pilot below steers itself (the guided launch has its own test: ux_test.gd)
 	_gs.settings["locale"] = "en"
 	_gs.apply_settings()
 

@@ -6,6 +6,7 @@ class Attitude extends Control:
 	var pitch := 0.0
 	var prograde := 0.0
 	var show_prograde := false
+	var target_pitch := NAN        # guided launch: where the guide wants the nose (rad from vertical)
 
 	func _init() -> void:
 		custom_minimum_size = Vector2(120, 120)
@@ -34,6 +35,11 @@ class Attitude extends Control:
 			draw_line(pp + Vector2(0, -12), pp + Vector2(0, -7), UIKit.C_GOOD, 2.0)
 			draw_line(pp + Vector2(-12, 0), pp + Vector2(-7, 0), UIKit.C_GOOD, 2.0)
 			draw_line(pp + Vector2(12, 0), pp + Vector2(7, 0), UIKit.C_GOOD, 2.0)
+		if not is_nan(target_pitch):
+			var tu := Vector2(sin(target_pitch), -cos(target_pitch))
+			var tp := c + tu * r * 0.82
+			draw_arc(tp, 9.0, 0.0, TAU, 24, UIKit.C_ACCENT, 2.5, true)       # steer the orange nose into this ring
+			draw_arc(tp, 3.0, 0.0, TAU, 12, UIKit.C_ACCENT, 2.0, true)
 		draw_circle(c, 3.0, Color.WHITE)
 		# local vertical mark
 		draw_colored_polygon(PackedVector2Array([c + Vector2(0, -r - 1), c + Vector2(-5, -r + 8), c + Vector2(5, -r + 8)]),
@@ -55,6 +61,7 @@ var _warp: Label
 var _clock: Label
 var _att: Attitude
 var _assist: Label
+var _guide_lbl: Label
 
 
 func build() -> void:
@@ -110,6 +117,10 @@ func build() -> void:
 	_assist.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_assist.custom_minimum_size.x = 150
 	av.add_child(_assist)
+	_guide_lbl = UIKit.label("HUD_GUIDE_ON", 13, UIKit.C_ACCENT, HORIZONTAL_ALIGNMENT_CENTER)
+	_guide_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_guide_lbl.custom_minimum_size.x = 150
+	av.add_child(_guide_lbl)
 
 	# ---- clock / warp (top-right)
 	var tr_p := UIKit.panel()
@@ -216,6 +227,13 @@ func refresh(m: FlightModel, warp: int, assist: bool, mission_time: float) -> vo
 	_warp.text = "x%d" % warp
 	var sec := int(maxf(mission_time, 0.0))
 	_clock.text = "T+ %02d:%02d" % [sec / 60, sec % 60]
+
+
+## Guided launch indicator and the target-pitch ring on the attitude dial (NAN = no target).
+func set_guided(on: bool, target_pitch: float = NAN) -> void:
+	_guide_lbl.text = "HUD_GUIDE_ON" if on else "HUD_GUIDE_OFF"
+	_guide_lbl.add_theme_color_override("font_color", UIKit.C_ACCENT if on else UIKit.C_MUTED)
+	_att.target_pitch = target_pitch if on else NAN
 
 
 func set_hint(key: String, color: Color = UIKit.C_TEXT) -> void:

@@ -4,6 +4,12 @@ extends Control
 ## (or press "Install"), live mass / thrust / delta-v / cost readout.
 
 signal launch_requested(build: Dictionary)
+signal back_requested            # one step back: to the payload / satellite design
+signal missions_requested        # leave to the mission list
+
+const REQUIRED := ["nose", "tank", "engine"]
+## Safe starter rocket (not an optimal one): fairing + medium tank + Kestrel engine.
+const STARTER := {"nose": "std", "tank": "m", "engine": "kestrel"}
 
 const SLOT_KEYS := {"nose": "M1_SLOT_NOSE", "upper": "M1_SLOT_UPPER", "tank": "M1_SLOT_TANK", "engine": "M1_SLOT_ENGINE", "booster": "M1_SLOT_BOOSTER"}
 
@@ -238,13 +244,17 @@ func _build_left() -> Control:
 	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sc.add_child(v)
 	v.add_child(UIKit.label("M1_ASM_TITLE", 26, Color.WHITE))
-	v.add_child(UIKit.label("M1_ASM_HINT", 13, UIKit.C_MUTED))
+	var asm_hint := UIKit.label("M1_ASM_HINT", 13, UIKit.C_MUTED)
+	asm_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	asm_hint.custom_minimum_size.x = 290
+	v.add_child(asm_hint)
 	v.add_child(HSeparator.new())
 	for slot in _slots():
 		var row := UIKit.hbox(6)
 		var name_col := UIKit.vbox(0)
 		name_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		name_col.add_child(UIKit.label(SLOT_KEYS[slot], 12, UIKit.C_MUTED))
+		var title_l := UIKit.label(SLOT_KEYS[slot], 12, UIKit.C_MUTED)
+		name_col.add_child(title_l)
 		var val := UIKit.label("M1_EMPTY", 17, UIKit.C_TEXT)
 		name_col.add_child(val)
 		row.add_child(name_col)
@@ -253,7 +263,15 @@ func _build_left() -> Control:
 		rm.pressed.connect(func(): _on_install(slot, ""))
 		row.add_child(rm)
 		v.add_child(row)
-		_slot_rows[slot] = {"label": val, "remove": rm}
+		_slot_rows[slot] = {"label": val, "remove": rm, "title": title_l}
+	var starter := UIKit.button("M1_STARTER", Vector2(0, 34))
+	starter.name = "StarterButton"
+	starter.add_theme_font_size_override("font_size", 14)
+	starter.tooltip_text = "M1_STARTER_TIP"
+	starter.pressed.connect(func():
+		for sl in STARTER:
+			_on_install(sl, str(STARTER[sl])))
+	v.add_child(starter)
 	v.add_child(HSeparator.new())
 	v.add_child(UIKit.label("M1_STATS", 18, UIKit.C_ACCENT))
 	var g := GridContainer.new()
@@ -280,12 +298,26 @@ func _build_left() -> Control:
 	v.add_child(HSeparator.new())
 	_ready_label = UIKit.label("", 15, UIKit.C_TEXT)
 	_ready_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_ready_label.custom_minimum_size = Vector2(290, 56)
+	_ready_label.custom_minimum_size = Vector2(290, 70)
 	v.add_child(_ready_label)
-	_launch = UIKit.button("M1_TO_REVIEW", Vector2(0, 58))
+	_launch = UIKit.button("M1_TO_REVIEW", Vector2(0, 54))
 	_launch.add_theme_font_size_override("font_size", 22)
 	_launch.pressed.connect(func(): launch_requested.emit(build.duplicate()))
 	outer.add_child(_launch)
+	var nav := UIKit.hbox(6)
+	var back := UIKit.button("BTN_BACK", Vector2(0, 38))
+	back.name = "BackButton"
+	back.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	back.add_theme_font_size_override("font_size", 15)
+	back.pressed.connect(func(): back_requested.emit())
+	nav.add_child(back)
+	var miss := UIKit.button("BTN_MISSIONS", Vector2(0, 38))
+	miss.name = "MissionsButton"
+	miss.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	miss.add_theme_font_size_override("font_size", 15)
+	miss.pressed.connect(func(): missions_requested.emit())
+	nav.add_child(miss)
+	outer.add_child(nav)
 	return p
 
 
@@ -371,6 +403,13 @@ func _refresh() -> void:
 		lab.text = str(M1Parts.catalog(slot)[id]["name"]) if id != "" else ("M1_NO_UPPER" if slot == "upper" else ("M1_NO_BOOSTER" if slot == "booster" else "M1_EMPTY"))
 		lab.add_theme_color_override("font_color", UIKit.C_TEXT if id != "" else UIKit.C_MUTED)
 		(row["remove"] as Button).disabled = id == ""
+		var required := REQUIRED.has(slot)
+		var tl: Label = row["title"]
+		tl.text = "%s%s" % [tr(SLOT_KEYS[slot]), (" *  " + tr("M1_REQUIRED")) if (required and id == "") else ("  (" + tr("M1_REQUIRED") + ")" if required else "")]
+		tl.add_theme_color_override("font_color", UIKit.C_BAD if (required and id == "") else (UIKit.C_GOOD if id != "" else UIKit.C_MUTED))
+		if required and id == "":
+			lab.text = "M1_NOT_INSTALLED"
+			lab.add_theme_color_override("font_color", UIKit.C_WARN)
 	(_stat_labels["stages"] as Label).text = "%d" % int(st["stages"])
 	(_stat_labels["rel"] as Label).text = "%d%%" % int(float(st["rel"]) * 100.0)
 	(_stat_labels["mass"] as Label).text = Units.kg(float(st["mass_wet"]))
@@ -390,11 +429,20 @@ func _refresh() -> void:
 	UIKit.set_bar_color(_cost_bar, UIKit.C_BAD if bool(st["over_budget"]) else UIKit.C_WARN)
 	var msgs := M1Parts.readiness(st)
 	var worst: String = msgs[0]
+	var missing: Array[String] = []
+	for sl in REQUIRED:
+		if str(build.get(sl, "")) == "":
+			missing.append(tr(SLOT_KEYS[sl]))
 	var lines: Array[String] = []
-	for k in msgs.slice(0, 2):
-		lines.append(tr(k))
+	if not missing.is_empty():
+		lines.append(tr("M1_MISSING_PARTS") % ", ".join(missing))
+	else:
+		lines.append(tr("M1_VERDICT_OK") if worst == "M1_RDY_OK" else tr("M1_VERDICT_FIX"))
+		for k in msgs.slice(0, 3):
+			if k != "M1_RDY_OK":
+				lines.append("- " + tr(k))
 	_ready_label.text = "\n".join(lines)
-	_ready_label.add_theme_color_override("font_color", UIKit.C_GOOD if worst == "M1_RDY_OK" else (UIKit.C_MUTED if worst == "M1_RDY_INCOMPLETE" else UIKit.C_WARN))
+	_ready_label.add_theme_color_override("font_color", UIKit.C_GOOD if (missing.is_empty() and worst == "M1_RDY_OK") else (UIKit.C_BAD if not missing.is_empty() else UIKit.C_WARN))
 	_launch.disabled = not M1Parts.can_launch(st)
 
 
