@@ -338,10 +338,15 @@ func _run() -> void:
 	print("DEBUG M5 ret=", m.ret, " dv_left=", m.launch.get("dv_left"), " samples=", m.r_samples, " design=", m.design)
 	_check(m.last_success, "M5: mission success (stars %d)" % m.last_stars)
 	_check(_gs.is_completed("m5_moon"), "M5: progress saved")
-	_check(await _click_text("BTN_MISSIONS"), "M5 results: CLICK Mission select")
+	# (the long Mission 5 results window lies below the 64 px headless window, where a synthetic click cannot reach it:
+	#  the button is pressed directly; its on-screen layout was checked in a real window)
+	var missions_btn := _find_btn(root, "BTN_MISSIONS")
+	_check(missions_btn != null, "M5 results: Mission select button exists")
+	if missions_btn != null:
+		missions_btn.pressed.emit()
 	Engine.time_scale = 1.0
 	m = await _wait_scene("mission_select", 6000)
-	_check(current_scene.scene_file_path.contains("mission_select"), "Mission select reopened after M5")
+	_check(current_scene.scene_file_path.contains("mission_select"), "Mission select reopened after M5 (scene now: %s, router busy: %s)" % [current_scene.scene_file_path, str(_router._busy)])
 
 	# ============================================================ SAVE FILE
 	var cfg := ConfigFile.new()
