@@ -45,20 +45,27 @@ class OptionCard extends Button:
 		pressed.connect(func(): Sfx.play("click"))
 
 
+const PANEL_W := 470.0
+
+
 func _ready() -> void:
 	theme = UIKit.get_ui_theme()
 	mouse_filter = Control.MOUSE_FILTER_IGNORE   # only its two panels take the mouse; the rest is the 3D camera's
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var left := _build_left()
-	left.position = Vector2(16, 16)
-	left.custom_minimum_size = Vector2(420, 0)
+	# two panels of the same size and height; the strip under them holds the camera hint
+	left.set_anchors_and_offsets_preset(Control.PRESET_LEFT_WIDE)
+	left.offset_left = 16
+	left.offset_right = 16 + PANEL_W
+	left.offset_top = 16
+	left.offset_bottom = -68
 	add_child(left)
 	var right := _build_right()
 	right.set_anchors_and_offsets_preset(Control.PRESET_RIGHT_WIDE)
-	right.offset_left = -500
+	right.offset_left = -16 - PANEL_W
 	right.offset_right = -16
 	right.offset_top = 16
-	right.offset_bottom = -16
+	right.offset_bottom = -68
 	add_child(right)
 	_rebuild_sat()
 	_refresh()
@@ -71,7 +78,7 @@ func _build_left() -> Control:
 	v.add_child(UIKit.label("M1D_TITLE", 28, Color.WHITE))
 	var pipe := UIKit.label("M1D_PIPELINE", 12, UIKit.C_ORANGE)
 	pipe.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	pipe.custom_minimum_size.x = 390
+	pipe.custom_minimum_size.x = 430
 	v.add_child(pipe)
 	v.add_child(HSeparator.new())
 	v.add_child(UIKit.label("M1D_STEP_GOAL", 18, UIKit.C_ACCENT))
@@ -87,14 +94,14 @@ func _build_left() -> Control:
 		_goal_buttons[gid] = b
 	_goal_desc = UIKit.label("", 14, UIKit.C_TEXT)
 	_goal_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_goal_desc.custom_minimum_size = Vector2(390, 62)
+	_goal_desc.custom_minimum_size = Vector2(430, 50)
 	v.add_child(_goal_desc)
 	v.add_child(UIKit.label("M1D_REQ_TITLE", 16, UIKit.C_ACCENT))
 	_req_orbit = UIKit.label("", 15, UIKit.C_GOOD)
 	v.add_child(_req_orbit)
 	var rules := UIKit.label("M1D_REQ_RULES", 12, UIKit.C_MUTED)
 	rules.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	rules.custom_minimum_size.x = 390
+	rules.custom_minimum_size.x = 430
 	v.add_child(rules)
 	v.add_child(HSeparator.new())
 	# segments

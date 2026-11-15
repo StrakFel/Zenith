@@ -49,10 +49,10 @@ func setup(mission_mode: bool, top: float = -1.0, right: bool = false) -> void:
 func _layout() -> void:
 	if _bottom:
 		# assembly screens: between the side panels at the bottom, never over the part tabs / cards
-		if _bottom_mid:      # between the two side panels of the design screen
-			_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-			_panel.offset_left = -136
-			_panel.offset_right = 136
+		if _bottom_mid:      # design screen: exactly under the left panel, same width
+			_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+			_panel.offset_left = 16
+			_panel.offset_right = 16 + 470
 		else:                # left, in the free 3D area next to the designer panel
 			_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 			_panel.offset_left = 16
@@ -118,7 +118,7 @@ func set_bottom(on: bool, seconds: float = 0.0, middle: bool = false) -> void:
 	_bottom = on
 	_bottom_mid = middle
 	if on:
-		_label.custom_minimum_size.x = 250.0 if middle else 292.0
+		_label.custom_minimum_size.x = 440.0 if middle else 292.0
 		_label.text = "CAM_HINT_SHORT"
 	else:
 		_label.text = "CAM_HINT_MISSION" if _mission_mode else "CAM_HINT_MENU"
