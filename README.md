@@ -102,7 +102,7 @@ Event: [NASA Space Apps Challenge](https://www.spaceappschallenge.org/)
 
 - **Godot 4.7**, GDScript, Forward+ renderer; 3D with procedural planet / sky shaders.
 - Models generated procedurally with **Blender** (script in `Tools/blender/`) and exported as `.glb`.
-- All sound is synthesised at runtime (no audio files).
+- Sound effects are synthesised at runtime; background music is two tracks in `Assets/Audio` (calm: menus, designer, briefings; energetic: launch and active mission phases) managed by the `AudioManager` autoload with crossfades, a seamless loop and Music / SFX buses (Settings: Music volume, SFX volume, Music on/off).
 - Localisation through Godot `TranslationServer` (`Core/strings_*.gd`).
 
 ## Run the project

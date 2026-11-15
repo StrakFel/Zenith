@@ -12,6 +12,9 @@ var save_path: String = TEST_SAVE_PATH if OS.get_cmdline_args().has("--script") 
 var settings: Dictionary = {
 	"locale": "en",
 	"volume": 0.8,
+	"music_volume": 0.7,
+	"sfx_volume": 0.8,
+	"music_on": true,
 	"display_mode": "fullscreen",   # "fullscreen" (default) or "windowed"; Alt+Enter toggles
 	"shake": true,
 	"unlock_all": false,

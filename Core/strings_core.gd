@@ -31,7 +31,7 @@ const DATA: Dictionary = {
 	"COMING_SOON": ["Coming soon", "Незабаром"],
 	"SET_TITLE": ["Settings", "Налаштування"],
 	"SET_LANGUAGE": ["Language", "Мова"],
-	"SET_VOLUME": ["Master volume", "Гучність"],
+	"SET_VOLUME": ["Master volume", "Загальна гучність"],
 	"SET_FULLSCREEN": ["Fullscreen", "Повноекранний режим"],
 	"SET_SHAKE": ["Camera shake", "Тряска камери"],
 	"SET_UNLOCK_ALL": ["Unlock all missions (demo)", "Відкрити всі місії (демо)"],

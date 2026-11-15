@@ -3,6 +3,9 @@ extends RefCounted
 ## "NASA Resources" screen texts. The links themselves live in Menus/TempMenu/nasa_resources.gd.
 
 const DATA: Dictionary = {
+	"SET_MUSIC_VOL": ["Music volume", "Гучність музики"],
+	"SET_SFX_VOL": ["SFX volume", "Гучність ефектів"],
+	"SET_MUSIC_ON": ["Music", "Музика"],
 	"MENU_NASA": ["NASA Resources", "Ресурси NASA"],
 	"NR_TITLE": ["NASA Resources", "Ресурси NASA"],
 	"NR_INTRO": ["Real NASA material that inspired ZENITH. The gameplay is simplified on purpose: it teaches the trade-offs of mission design, it is not an engineering tool.", "Справжні матеріали NASA, що надихнули ZENITH. Геймплей навмисно спрощений: гра вчить компромісів проєктування місій, а не замінює інженерні розрахунки."],

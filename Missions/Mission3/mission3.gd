@@ -53,6 +53,10 @@ func _briefing_data() -> Dictionary:
 	}
 
 
+func music_mood() -> String:
+	return "action" if ((started or _launching) and not ended) else "calm"
+
+
 func _build_mission() -> void:
 	var wl := CanvasLayer.new()
 	wl.layer = 0

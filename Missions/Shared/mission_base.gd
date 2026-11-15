@@ -32,6 +32,12 @@ func _ready() -> void:
 
 
 ## Build world, HUD, etc. (called before the briefing is shown).
+## Music mood asked by AudioManager: "action" while the mission phase is running, "calm" otherwise (briefing, results).
+func music_mood() -> String:
+	var s: Variant = get("started")
+	return "action" if (s != null and bool(s) and not ended) else "calm"
+
+
 func _build_mission() -> void:
 	pass
 

@@ -18,6 +18,7 @@ func _ready() -> void:
 	_rng.seed = 4242
 	for i in 8:
 		var p := AudioStreamPlayer.new()
+		p.bus = &"SFX"
 		add_child(p)
 		_pool.append(p)
 	_music = AudioStreamPlayer.new()
@@ -40,6 +41,7 @@ func loop(sound: String, vol_db: float = 0.0, pitch: float = 1.0) -> void:
 	var p: AudioStreamPlayer = _loops.get(sound)
 	if p == null:
 		p = AudioStreamPlayer.new()
+		p.bus = &"SFX"
 		p.stream = _stream(sound)
 		add_child(p)
 		_loops[sound] = p
@@ -61,6 +63,7 @@ func stop_all_loops() -> void:
 
 
 func music(on: bool = true) -> void:
+	return          # background music is handled by AudioManager (Assets/Audio)
 	if on:
 		if _music.stream == null:
 			_music.stream = _stream("ambient")

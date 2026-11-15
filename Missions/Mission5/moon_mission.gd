@@ -104,6 +104,10 @@ func _briefing_data() -> Dictionary:
 
 
 # ------------------------------------------------------------------ build --
+func music_mood() -> String:
+	return "action" if (state >= S.LAUNCH and state <= S.UPLINK and not ended) else "calm"
+
+
 func _build_mission() -> void:
 	planner = TransferPlanner3D.new()
 	add_child(planner)

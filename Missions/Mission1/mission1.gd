@@ -111,6 +111,12 @@ func _briefing_data() -> Dictionary:
 	}
 
 
+func music_mood() -> String:
+	if ended:
+		return "calm"
+	return "action" if state in [S.COUNTDOWN, S.FLIGHT, S.DEPLOY, S.DOWNLINK] else "calm"
+
+
 func _build_mission() -> void:
 	pad_scene = PadScene3D.new()
 	add_child(pad_scene)

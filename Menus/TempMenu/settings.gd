@@ -65,6 +65,14 @@ func _ready() -> void:
 	slider.value_changed.connect(func(val: float): GameState.set_setting("volume", val))
 	v.add_child(slider)
 
+	v.add_child(UIKit.label("SET_MUSIC_VOL", 20, UIKit.C_ACCENT))
+	v.add_child(_slider("music_volume", 0.0, 1.0, 0.05))
+	v.add_child(_toggle("SET_MUSIC_ON", "music_on"))
+	v.add_child(UIKit.label("SET_SFX_VOL", 20, UIKit.C_ACCENT))
+	var sfx := _slider("sfx_volume", 0.0, 1.0, 0.05)
+	sfx.drag_ended.connect(func(_c): Sfx.play("click"))
+	v.add_child(sfx)
+
 	v.add_child(UIKit.label("SET_SENS", 20, UIKit.C_ACCENT))
 	var sens := HSlider.new()
 	sens.min_value = 0.5
@@ -113,6 +121,17 @@ func _choice_row(items: Array, current: String, on_pick: Callable) -> Control:
 		b.pressed.connect(on_pick.bind(str(it[1])))
 		row.add_child(b)
 	return row
+
+
+func _slider(setting: String, lo: float, hi: float, step: float) -> HSlider:
+	var s := HSlider.new()
+	s.min_value = lo
+	s.max_value = hi
+	s.step = step
+	s.value = float(GameState.settings[setting])
+	s.custom_minimum_size = Vector2(0, 26)
+	s.value_changed.connect(func(val: float): GameState.set_setting(setting, val))
+	return s
 
 
 func _toggle(key: String, setting: String) -> CheckButton:
