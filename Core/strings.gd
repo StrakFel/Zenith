@@ -15,6 +15,7 @@ static func all() -> Dictionary:
 	d.merge(StringsCam.DATA, true)
 	d.merge(StringsLunar.DATA, true)
 	d.merge(StringsCampaign.DATA, true)
+	d.merge(StringsNasa.DATA, true)
 	return d
 
 

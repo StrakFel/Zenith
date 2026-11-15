@@ -1,111 +1,142 @@
-# ZENITH
+# ZENITH - Space Mission Design Game
 
-Educational 2D space-mission game for the **NASA Space Mission Design Game Hackathon**.
-Godot 4.7 (GL Compatibility), GDScript only, all art is drawn procedurally (no external assets).
+**ZENITH** is a 3D educational game about designing space missions, built for the **NASA Space Apps Challenge 2026**
+(*Space Mission Design Game*). You do not just fly a rocket - you act as the mission designer: pick a science goal,
+design the spacecraft and the launch vehicle under budget, mass and power constraints, pass a verification review,
+launch, and find out how much science your design actually returns.
 
-## Missions
+> Engine: Godot 4.7 (Forward+), GDScript only. Languages: English and Ukrainian. Prototype build.
 
-| # | Mission | Status |
-|---|---------|--------|
-| 1 | **First Launch** - design the satellite and the rocket (stages, fairing), launch, deploy, downlink | playable, balanced (8748 designs analysed) |
-| 2 | **Space Operations** - design the EVA package (oxygen / gas / suit) and its rocket, launch, then the spacewalk repair | playable |
-| 3 | **ISS Expedition** - design the science cargo + rocket, launch to the station, rendezvous and dock | playable |
-| 4 | **Satellite Constellation** - heavy multi-stage rocket with strap-on boosters, launch N satellites, deploy them into evenly spaced slots (phasing) | playable prototype |
-| 5 | **Moon & Return** - heavy launch system, trans-lunar burn, landing + rover science, ascent, trans-Earth burn, re-entry | playable; the three return legs are a prototype (decisions with real numbers, no flight simulation) |
+## The idea: the NASA design loop
 
-Every mission follows the same loop: **payload lab -> rocket designer -> Mission Validation -> launch -> hand-off -> operations -> results**.
-The shared launch segment is the Mission 1 scene configured by a `LaunchProfile` (`Missions/Shared/launch_profiles.gd`);
-the launch result (hull, orbit, propellant left, reliability, cost) is handed to the operations scene through `GameState.session`
-and changes what the operations phase gives. New rocket parts unlock with the campaign (`M1Parts.UNLOCK`): tank XL (M2),
-cryogenic upper stage (M3), strap-on boosters (M4), Titan engine and trans-lunar stage (M5).
+Every mission follows the same loop, inspired by the NASA systems-engineering process:
+
+**Scientific objective -> Requirements -> Mission design -> Verification -> Launch -> Operations -> Science results**
+
+1. **Science goal and payload lab** - choose what the mission should learn and design the payload (instrument, power, battery, antenna, ...).
+2. **Rocket designer (mandatory in every mission)** - pick fairing, tank, engine, upper stage and (from Mission 4) strap-on boosters.
+   Live stats: mass, propellant, thrust, thrust-to-weight, delta-v, reliability, cost against a budget.
+3. **Mission Validation** - a requirements checklist with explanations (OK / RISK / FAIL) before you are allowed to launch.
+4. **Launch** - an ascent through max-Q and stage separations to orbit, flown by the **autopilot** (default), with
+   **Assisted** and **Manual** modes available.
+5. **Operations** - the mission-specific phase (satellite operations, spacewalk, docking, constellation, lunar expedition).
+6. **Results** - stars, a "Mission Success Proximity" score with a personal best, and an explanation of what helped or hurt.
+
+The four NASA mission segments are modelled: **Launch**, **Space**, **Ground** (downlink windows) and **Users** (what the data is worth).
+
+## The five missions
+
+| # | Mission | What you do |
+|---|---------|-------------|
+| 1 | **First Launch** | Choose a science goal, design a satellite and a rocket, reach orbit, deploy and downlink data. |
+| 2 | **Space Operations** | Design an EVA package (oxygen, gas, suit) and its launch vehicle, then perform a spacewalk repair. |
+| 3 | **ISS Expedition** | Design a science cargo and rocket, launch to the station, rendezvous and dock. |
+| 4 | **Satellite Constellation** | Heavy multi-stage rocket with boosters; deploy several satellites into evenly spaced orbital slots (prototype). |
+| 5 | **Moon and Return** | Heavy launch, trans-lunar burn, powered landing, rover science, ascent, trans-Earth burn and re-entry (return legs are a prototype). |
+
+Missions unlock one after another and progress is saved. New rocket parts unlock as the campaign advances.
+A **Demo Mode** (Settings) unlocks every mission and adds a demonstration rocket in the designer.
+
+## Features
+
+- Full 3D scenes: launch site, rocket with visible stage / booster / fairing separation, Earth, Moon, station, free orbit camera.
+- Rocket designer with required-part markers, drag and drop, validation and budget bars.
+- Flight physics with gravity, atmosphere, drag, max-Q, staging and orbital elements (apoapsis / periapsis).
+- Flight modes: **Automatic** (autopilot flies, take over with any control key or `M`), **Assisted** (guide shows the next step),
+  **Manual**.
+- Adaptive UI: scales from 1280x720 to 4K, 16:9 / 16:10 / 21:9, fullscreen by default (Alt+Enter), windowed mode in Settings.
+- English / Ukrainian, switchable at runtime in Settings.
+- In-game **NASA Resources** screen (main menu) with the NASA material that inspired the game.
+
+## Controls
+
+| Key | Action |
+|-----|--------|
+| `W` / `S` | Throttle up / down (Mission 1 launch) |
+| `A` / `D` | Pitch |
+| `Z` / `X` | Full throttle / engine cut |
+| `G` / `B` / `F` | Separate stage / boosters / jettison fairing (available only when safe) |
+| `T` | Prograde hold |
+| `M` | Autopilot on / off (any steering key also takes over) |
+| `H` | Guided launch hints on / off |
+| `1` `2` `3` | Time warp |
+| `SPACE` | Deploy payload |
+| `C` / `R` | Free camera (pauses the simulation) / reset camera |
+| Mouse | Left drag rotate, wheel zoom, right drag pan (over the 3D view) |
+| `F1` | Help |
+| `ESC` | Pause |
+| `Alt+Enter` | Fullscreen / windowed |
+
+Missions 2-5 list their specific controls in the briefing screen.
+
+## NASA Resources
+
+Open **NASA Resources** from the main menu to see these links with a short note on how each is used.
+The game is a simplified educational model - these sources informed the design, they are not a data source for the physics.
+
+| Resource | Used for |
+|----------|----------|
+| [NASA Systems Engineering Handbook](https://www.nasa.gov/reference/systems-engineering-handbook/) | The design loop: requirements, verification, validation, operations |
+| [NASA Glenn - Rocket Propulsion](https://www.grc.nasa.gov/www/k-12/airplane/rocket.html) | Thrust, specific impulse, rocket equation, staging |
+| [NASA Space Place - What Is an Orbit?](https://spaceplace.nasa.gov/orbits/en/) | Orbit basics shown in the flight HUD |
+| [NASA Earth Science](https://science.nasa.gov/earth/) | Mission 1 science goals (Earth observation) |
+| [NASA Earth Observatory](https://earthobservatory.nasa.gov/) | Imaging instruments and science return |
+| [NASA Worldview](https://worldview.earthdata.nasa.gov/) | Real satellite imagery as the "user" of the data |
+| [NASA Heliophysics](https://science.nasa.gov/heliophysics/) | Space-weather science goal |
+| [International Space Station](https://www.nasa.gov/international-space-station/) | Missions 2 and 3: EVA, rendezvous and docking |
+| [NASA Small Spacecraft Systems Virtual Institute](https://www.nasa.gov/smallsat-institute/) | Mission 4: small satellites and constellations |
+| [NASA Artemis](https://www.nasa.gov/humans-in-space/artemis/) | Mission 5: heavy launch, trans-lunar injection, landing, return |
+| [NASA - Earth's Moon](https://science.nasa.gov/moon/) | Mission 5: lunar environment and science |
+| [NASA - Apollo 11](https://www.nasa.gov/mission/apollo-11/) | Mission 5: landing and return profile |
+
+Event: [NASA Space Apps Challenge](https://www.spaceappschallenge.org/)
+
+## Honest limitations
+
+- Physics is **simplified on purpose**: a scaled-down Earth (radius 1600 km) so one stage can reach orbit, fixed eclipse and
+  contact times, shortened lunar surface day, simplified lunar-orbit insertion. It teaches trade-offs; it is not GMAT-grade analysis.
+- Missions 4 and 5 are playable prototypes (Mission 4 phasing, Mission 5 return legs are decisions with real numbers rather than full flight simulation).
+- Tested on Windows. Needs a GPU that supports the Forward+ renderer.
+
+## Technology
+
+- **Godot 4.7**, GDScript, Forward+ renderer; 3D with procedural planet / sky shaders.
+- Models generated procedurally with **Blender** (script in `Tools/blender/`) and exported as `.glb`.
+- All sound is synthesised at runtime (no audio files).
+- Localisation through Godot `TranslationServer` (`Core/strings_*.gd`).
+
+## Run the project
+
+1. Install [Godot 4.7](https://godotengine.org/download) (standard build).
+2. Open `project.godot` in Godot and press **F5** (or run `Godot --path .`).
+3. Fullscreen is the default; change it in **Settings**.
 
 ## Project layout
 
 ```
-Core/            autoloads (Loc, GameState, Router), UI kit, translations, units
-Core3D/          3D toolkit: SpaceStage (sky/sun/Earth/clouds), Rocket3D, LaunchPad3D, PadScene3D,
-				 FlightDirector3D (cameras + FX), RingMarker3D, Fx3D, shaders/ (procedural, no textures)
-Assets/Models/   .glb models generated from Blender (rocket parts, launchpad, station, ship, ...)
-Menus/TempMenu/  TEMPORARY 3D main menu / mission select / settings  (GameMenu/ is left untouched)
-Missions/Shared/ MissionBase, briefing, pause, result screen, off-screen arrow
-Missions/MissionN/  one folder per mission: gameplay simulation (reused) + 3D view
-Legacy2D/        the old 2D renderers (kept for reference, no longer used)
-Tools/           headless balance sim, end-to-end autopilot tests, screenshots, Blender/ asset generator
+Core/            autoloads (Loc, GameState, Router, Sfx), UI kit, translations
+Core3D/          3D toolkit: space stage, rocket, launch pad, cameras, shaders
+Assets/Models/   .glb models
+Menus/TempMenu/  main menu, mission select, settings, NASA Resources
+Missions/        MissionN/ - one folder per mission; Shared/ - briefing, pause, results, launch profiles
+Tools/           automated tests, balance simulation, screenshot helpers
 ```
 
-## Science loop (NASA-style)
-Mission 1 follows *Scientific goal -> Requirements -> Mission design -> Verification -> Launch -> Science results*
-and models the four segments: **Launch** (rocket), **Space** (satellite power/battery/orbit), **Ground**
-(downlink in one contact window per orbit) and **Users** (what the data is worth). The maths lives in
-`Missions/Mission1/m1_design.gd` (goals, instruments, solar/battery/antenna, requirements, science result) and is
-deliberately simplified (fixed eclipse and contact time, no orbit decay, linear altitude-window penalty) - it teaches
-trade-offs, it is not GMAT-grade analysis. Mission 2 (`Missions/Mission2/lunar_design.gd`, `lander_model.gd`) uses real Earth/Moon constants for the trans-lunar
-ellipse and a 2-D powered-descent lander; its lunar-orbit insertion is a fixed delta-v cost and the surface day is shortened
-(not GMAT-grade). Mission 3 delivers a fragile experiment (gentle docking = better data). The old spacewalk mechanic is kept
-as `Missions/Spacewalk/spacewalk.tscn` (EVA training, not in the campaign list).
+## Tests
 
-## Menus and camera
-* **Play** launches the next available mission straight away (Mission 1 with no progress; the last mission when
-  everything is done). **Missions** opens the 3D mission map: previews, description, difficulty, progress.
-  Missions unlock one after another, completed ones can be replayed, 4-5 are "coming soon".
-* `Core3D/orbit_camera_controller.gd` (`OrbitCameraController`) - reusable Mission-Viz style camera:
-  LMB drag rotate 360 deg (with inertia), wheel zoom (clamped), RMB drag pan, **R** reset, double-click focus.
-  It keeps the camera out of models (sphere / capsule obstacles) and above the ground. Scenes keep their own
-  cinematic camera and call `orbit.update(delta, auto_pos, auto_look, fov)` every frame; the controller hands the
-  camera over smoothly and back.
-* In missions the camera is a separate **inspect mode (C)**: the simulation is frozen, so the camera can never
-  change the rocket / astronaut / spacecraft; C or R resumes. In menus and the rocket designer it is always available.
-
-## Audio
-`Core/sfx.gd` (autoload `Sfx`) synthesises all sounds and the ambient loop at runtime - no audio files. Master volume
-is controlled from Settings.
-
-## 3D pipeline
-* **Models** are built procedurally by `Tools/blender/build_assets.py` (Blender 5.1, background mode) and exported
-  as `.glb`; re-run it after editing the script:
-  `blender --background --python Tools/blender/build_assets.py -- Assets/Models`
-  Palette: white / grey hull, dark technical parts, blue + orange accents (no red/blue/white stripes).
-* **Gameplay stays separate from rendering**: `FlightModel` (M1), `SpacewalkWorld` (M2) and `DockingWorld` (M3)
-  are the original simulations; `FlightDirector3D`, `SpacewalkView3D` and `DockingView3D` only read their state.
-* The Earth is a real sphere with a procedural shader (continents, clouds, atmosphere glow, city lights); the sky
-  shader fades from atmosphere to stars with altitude. Needs the **Forward+** renderer.
-
-### Replacing the temporary menu
-The final menu (`GameMenu/MainMenu/main_menu.tscn`) only has to call
-`Router.play()`, `Router.go_to(Router.MISSION_SELECT)`, `Router.go_to(Router.SETTINGS)` and
-`get_tree().quit()`. Then change `Router.MAIN_MENU` (`Core/router.gd`) and
-`application/run/main_scene` in `project.godot` to the new scene.
-
-### Adding mission 4 / 5
-1. Create a scene whose root script `extends MissionBase`, set `mission_id` in `_init()`,
-   implement `_briefing_data()`, `_build_mission()`, `_on_mission_start()` and call `finish(...)`.
-2. In `Core/mission_registry.gd` set `"available": true` and the `"scene"` path.
-3. Add texts to a new `Core/strings_mX.gd` and merge it in `Core/strings.gd`.
-
-## Localization
-English (default) and Ukrainian through `TranslationServer`. All texts live in `Core/strings_*.gd`
-as `KEY: [English, Українська]`; UI nodes use the key as their text, so they re-translate instantly
-when the language is switched. The language is selectable **only in Settings** and is saved.
-Audit: `Godot --headless --path . --script res://Tools/check_strings.gd`.
-
-## Controls (Mission 1)
-`W/S` throttle, `A/D` pitch, `T` prograde hold, `Z/X` full/cut, `1-3` time warp, `SPACE` deploy, `ESC` pause.
-Missions 2 and 3 list their controls in the briefing screen.
-
-## Developer tools
 ```
-# balance / physics check of every part combination
-Godot --headless --path . --script res://Tools/sim_test.gd
-# full scene run with an autopilot (assembly -> flight -> result -> saved progress)
-Godot --headless --fixed-fps 60 --path . --script res://Tools/e2e_m1.gd -- kestrel/l/aero 1
-Godot --headless --fixed-fps 60 --path . --script res://Tools/e2e_generic.gd -- res://Missions/Mission3/mission3.tscn 1
-Godot --headless --fixed-fps 60 --path . --script res://Tools/e2e_m2.gd -- site=pole,tank=l 8   # lunar expedition autopilot
-# screenshot of any scene (non-headless): Tools/run_shot.ps1
+# compile check of every script
+Godot --headless --path . res://Tools/compile_check.tscn --quit-after 120
+# EN/UK string audit
+Godot --headless --path . --script res://Tools/check_strings.gd
+# UX / menus / gated separations / autopilot
+Godot --headless --fixed-fps 60 --path . --script res://Tools/ux_test.gd --quit-after 400000
+# full 5-mission playthrough with real input events
+Godot --headless --fixed-fps 60 --path . --script res://Tools/play_full.gd --quit-after 900000
 ```
-Note: the e2e tests write to the normal save file; use *Settings -> Reset progress* afterwards.
 
-## Physics note (Mission 1)
-Simplified on purpose: a scaled-down Earth (radius 1600 km, g = 9.81 m/s^2) so a single stage can reach orbit.
-Gravity follows 1/r^2, atmosphere density falls exponentially, drag = 1/2 rho v^2 Cd A, engine Isp rises as the
-air thins, mass flow = thrust / (Isp g0). The HUD shows apoapsis/periapsis computed from the real orbit equations;
-a stable orbit means periapsis above 80 km.
+## Credits and licences
+
+Game code and generated assets: ZENITH team. Engine: [Godot Engine](https://godotengine.org/license/) (MIT).
+Models built with [Blender](https://www.blender.org/). NASA is credited as an inspiration and reference only;
+ZENITH is not affiliated with or endorsed by NASA.

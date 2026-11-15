@@ -1,4 +1,4 @@
-﻿extends Node3D
+extends Node3D
 ## TEMPORARY main menu (Play / Missions / Settings / Exit) over the cinematic 3D launch pad.
 ## Replace it with the final menu - see the note at the top of Core/router.gd.
 
@@ -58,6 +58,7 @@ func _ready() -> void:
 		["MENU_PLAY", Router.play],
 		["MENU_MISSIONS", func(): Router.go_to(Router.MISSION_SELECT)],
 		["MENU_SETTINGS", func(): Router.go_to(Router.SETTINGS)],
+		["MENU_NASA", func(): Router.go_to(Router.NASA)],
 		["MENU_EXIT", func(): get_tree().quit()],
 	]
 	for i in entries.size():

@@ -9,6 +9,7 @@ extends CanvasLayer
 const MAIN_MENU := "res://Menus/TempMenu/temp_main_menu.tscn"
 const MISSION_SELECT := "res://Menus/TempMenu/mission_select.tscn"
 const SETTINGS := "res://Menus/TempMenu/settings.tscn"
+const NASA := "res://Menus/TempMenu/nasa_resources.tscn"
 
 var _rect: ColorRect
 var _busy := false

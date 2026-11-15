@@ -11,6 +11,7 @@ const SCREENS := [
 	["menu", "res://Menus/TempMenu/temp_main_menu.tscn", []],
 	["select", "res://Menus/TempMenu/mission_select.tscn", []],
 	["settings", "res://Menus/TempMenu/settings.tscn", []],
+	["nasa", "res://Menus/TempMenu/nasa_resources.tscn", []],
 	["briefing", "res://Missions/Mission1/mission1.tscn", []],
 	["design", "res://Missions/Mission1/mission1.tscn", ["dev_skip_briefing"]],
 	["assembly", "res://Missions/Mission1/mission1.tscn", ["dev_auto_design"]],

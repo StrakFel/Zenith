@@ -9,7 +9,7 @@ class Attitude extends Control:
 	var target_pitch := NAN        # guided launch: where the guide wants the nose (rad from vertical)
 
 	func _init() -> void:
-		custom_minimum_size = Vector2(120, 120)
+		custom_minimum_size = Vector2(104, 104)
 
 	func _draw() -> void:
 		var c := size * 0.5
@@ -116,15 +116,15 @@ func build() -> void:
 	br.add_child(av)
 	_att = Attitude.new()
 	av.add_child(_att)
-	_assist = UIKit.label("HUD_ASSIST_OFF", 14, UIKit.C_MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	_assist = UIKit.label("HUD_ASSIST_OFF", 12, UIKit.C_MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	_assist.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_assist.custom_minimum_size.x = 150
 	av.add_child(_assist)
-	_auto_lbl = UIKit.label("HUD_AUTO_ON", 14, UIKit.C_GOOD, HORIZONTAL_ALIGNMENT_CENTER)
+	_auto_lbl = UIKit.label("HUD_AUTO_ON", 13, UIKit.C_GOOD, HORIZONTAL_ALIGNMENT_CENTER)
 	_auto_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_auto_lbl.custom_minimum_size.x = 150
 	av.add_child(_auto_lbl)
-	_guide_lbl = UIKit.label("HUD_GUIDE_ON", 13, UIKit.C_ACCENT, HORIZONTAL_ALIGNMENT_CENTER)
+	_guide_lbl = UIKit.label("HUD_GUIDE_ON", 12, UIKit.C_ACCENT, HORIZONTAL_ALIGNMENT_CENTER)
 	_guide_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_guide_lbl.custom_minimum_size.x = 150
 	av.add_child(_guide_lbl)
