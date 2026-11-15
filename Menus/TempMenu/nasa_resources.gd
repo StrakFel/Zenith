@@ -57,7 +57,7 @@ func _ready() -> void:
 	for it in LINKS:
 		list.add_child(_row(str(it[0]), str(it[1]), str(it[2])))
 	var back := UIKit.button("BTN_BACK", Vector2(200, 46))
-	back.pressed.connect(func(): Router.go_to(Router.MAIN_MENU))
+	back.pressed.connect(func(): Router.go_to(Router.SETTINGS))
 	outer.add_child(back)
 
 

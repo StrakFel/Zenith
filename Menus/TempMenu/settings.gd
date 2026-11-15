@@ -98,6 +98,9 @@ func _ready() -> void:
 	_reset_btn.pressed.connect(_on_reset)
 	v.add_child(_reset_btn)
 
+	var nasa := UIKit.button("MENU_NASA", Vector2(0, 44))
+	nasa.pressed.connect(func(): Router.go_to(Router.NASA))
+	outer.add_child(nasa)
 	var back := UIKit.button("BTN_BACK", Vector2(200, 48))
 	back.pressed.connect(func(): Router.go_to(Router.MAIN_MENU))
 	outer.add_child(back)
