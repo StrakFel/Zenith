@@ -266,13 +266,7 @@ func _update_assembly_camera(delta: float) -> void:
 	var az := deg_to_rad(28.0)                        # fixed view: the background must not drift while parts are chosen
 	var r := maxf(150.0, h * 2.6)
 	# the designer panel covers the right part of the screen: shift the view so the rocket stands in the middle of the free area (left)
-	var shift := Vector3.ZERO
-	if assembly != null:
-		var vs := get_viewport().get_visible_rect().size
-		var free_c := (16.0 + (vs.x - 16.0 - AssemblyView.PANEL_W - 14.0)) * 0.5
-		var frac := (vs.x * 0.5 - free_c) / vs.x
-		var half_w := tan(deg_to_rad(36.0) * 0.5) * (vs.x / vs.y)
-		shift = Vector3(cos(az), 0.0, -sin(az)) * r * half_w * 2.0 * frac
+	var shift := Vector3.ZERO                         # the rocket stands between the two equal panels: no shift needed
 	pad_scene.orbit.update(delta, center + Vector3(sin(az) * r, 6.0, cos(az) * r) + shift, center + Vector3(0, -2, 0) + shift, 36.0)
 
 

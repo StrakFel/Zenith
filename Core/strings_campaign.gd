@@ -33,6 +33,7 @@ const DATA: Dictionary = {
 	"AP_ORBIT": ["stable orbit - deploying the payload.", "стабільна орбіта - розгортання навантаження."],
 	"SUM_AUTOFLIGHT": ["Autopilot flies the rocket (recommended): you watch how your design performs and can take over at any time", "Автопілот веде ракету (рекомендовано): ви дивитесь, як працює ваш проєкт, і можете перейняти керування будь-коли"],
 	"GUIDE_FALL": ["You are falling! The engine must keep burning and tilt east: hold full throttle (Z) and build sideways speed, do not cut the engine early.", "Ви падаєте! Двигун має працювати й нахилятися на схід: тримайте повну тягу (Z), набирайте бічну швидкість, не вимикайте двигун завчасно."],
+	"M1_ST_PARTS": ["Your rocket", "Ваша ракета"],
 	# ---- flight mode selector, display
 	"SUM_FLIGHT_MODE": ["Flight mode", "Режим польоту"],
 	"FM_AUTO": ["Automatic", "Автоматичний"],

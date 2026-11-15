@@ -9,7 +9,7 @@ signal missions_requested        # leave to the mission list
 
 const TAB_KEYS := {"upper": "M1_TAB_UPPER", "booster": "M1_TAB_BOOSTER"}      # short tab captions
 ## Width of the single designer panel (the rest of the screen is the 3D rocket view).
-const PANEL_W := 560.0
+const PANEL_W := 500.0
 const REQUIRED := ["nose", "tank", "engine"]
 ## Safe starter rocket (not an optimal one): fairing + medium tank + Kestrel engine.
 const STARTER := {"nose": "std", "tank": "m", "engine": "kestrel"}
@@ -183,7 +183,7 @@ class PadCanvas extends Control:
 			draw_line(Vector2(bx, pt.y), Vector2(bx + 10, pt.y), Color(col.r, col.g, col.b, 0.85), 2.0, true)
 			draw_line(Vector2(bx, mid.y), Vector2(mid.x - rpx - 6.0, mid.y), Color(col.r, col.g, col.b, 0.5), 1.5, true)
 			draw_string(font, Vector2(bx - 196.0, mid.y + 6.0), tr(AssemblyView.SLOT_KEYS[slot]),
-				HORIZONTAL_ALIGNMENT_RIGHT, 186.0, 17, col)
+				HORIZONTAL_ALIGNMENT_RIGHT, 186.0, 15, col)
 			if hover_slot == slot:
 				var hr := Rect2(Vector2(mid.x - rpx - 12.0, minf(pb.y, pt.y) - 6.0),
 					Vector2(rpx * 2.0 + 24.0, absf(pt.y - pb.y) + 12.0))
@@ -225,8 +225,10 @@ func _ready() -> void:
 	_canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_canvas.scene3d = scene3d
 	_canvas.part_dropped.connect(_on_install)
-	cols.add_child(_canvas)                    # the rocket stands here (left), the designer is ONE wide panel (right)
-	cols.add_child(_build_panel())
+	var pans := _build_panels()
+	cols.add_child(pans[0])                    # left: part catalog | middle: the rocket | right: installed parts, stats, actions
+	cols.add_child(_canvas)
+	cols.add_child(pans[1])
 	_show_tab("engine")
 	if scene3d != null:
 		scene3d.set_build(build, true)
@@ -234,11 +236,15 @@ func _ready() -> void:
 
 
 ## ONE compact designer block on the right (the big free area on the left belongs to the 3D rocket view).
-func _build_panel() -> Control:
+func _build_panels() -> Array:
 	var p := UIKit.panel()
 	p.custom_minimum_size = Vector2(PANEL_W, 0)
-	var outer := UIKit.vbox(5)
+	var outer := UIKit.vbox(6)
 	p.add_child(outer)
+	var p2 := UIKit.panel()
+	p2.custom_minimum_size = Vector2(PANEL_W, 0)
+	var outer2 := UIKit.vbox(6)
+	p2.add_child(outer2)
 	# --- header
 	var head := UIKit.hbox(8)
 	head.add_child(UIKit.label("M1_ASM_TITLE", 24, Color.WHITE))
@@ -278,13 +284,14 @@ func _build_panel() -> Control:
 		_tab_buttons[slot] = b
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.custom_minimum_size.y = 120
+	scroll.custom_minimum_size.y = 200
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	outer.add_child(scroll)
 	_cards_box = UIKit.vbox(6)
 	_cards_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(_cards_box)
-	outer.add_child(HSeparator.new())
+	outer = outer2                      # from here on: the right panel (installed parts, stats, actions)
+	outer.add_child(UIKit.label("M1_ST_PARTS", 20, UIKit.C_ACCENT))
 	# --- installed parts: one aligned row per slot
 	var grid := GridContainer.new()
 	grid.columns = 3
@@ -353,7 +360,7 @@ func _build_panel() -> Control:
 	miss.pressed.connect(func(): missions_requested.emit())
 	nav.add_child(miss)
 	outer.add_child(nav)
-	return p
+	return [p, p2]
 
 
 ## Slots that exist in the mission being designed (strap-on boosters appear from Mission 4).
