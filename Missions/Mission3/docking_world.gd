@@ -26,11 +26,11 @@ const TOL_LAT_RATE := 0.3
 const TOL_OMEGA := 0.052       # ~3 deg/s
 
 var pos := Vector2(-300.0, 30.0)
-var vel := Vector2(6.0, -0.12)      # fast approach (was 2 m/s)
+var vel := Vector2(3.5, -0.12)      # gentle start (the autopilot / pilot speeds up later; was 2 m/s originally)
 var angle := 0.5
 var omega := 0.0
 var fuel := FUEL_MAX
-var warp := 8                       # time compression for the long far approach (drops to x1 inside 150 m)
+var warp := 5                       # time compression for the long far approach (drops to x1 inside 150 m)
 var finished := false
 var contact_result := ""
 var contact_speed := 0.0
