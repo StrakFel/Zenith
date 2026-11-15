@@ -15,6 +15,7 @@ var settings: Dictionary = {
 	"fullscreen": false,
 	"shake": true,
 	"unlock_all": false,
+	"autoflight": true,   # after the design the autopilot flies the rocket (the player can take over at any time)
 	"guided": true,    # Guided Launch: the flight guide shows the next step and holds the pitch profile
 	"sens": 1.0,   # control sensitivity multiplier (0.5 - 1.5)
 }

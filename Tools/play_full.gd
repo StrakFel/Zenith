@@ -158,6 +158,7 @@ func _run() -> void:
 	root.size = Vector2i(1280, 720)
 	_gs.progress.clear()
 	_gs.settings["unlock_all"] = false
+	_gs.settings["autoflight"] = false    # manual keyboard pilot below (autopilot has its own test in ux_test.gd)
 	_gs.settings["guided"] = false        # the keyboard pilot below steers itself (the guided launch has its own test: ux_test.gd)
 	_gs.settings["locale"] = "en"
 	_gs.apply_settings()
@@ -219,7 +220,7 @@ func _run() -> void:
 	var inst := _find_btn(root, "M1_INSTALL")
 	var card_ctrl: Control = inst.get_parent().get_parent().get_parent()   # the card
 	var from := card_ctrl.get_global_rect().position + Vector2(40, 40)
-	await _drag(MOUSE_BUTTON_LEFT, Vector2(640, 360) - from, from)
+	await _drag(MOUSE_BUTTON_LEFT, m.assembly._canvas.get_global_rect().get_center() - from, from)
 	await _frames(10)
 	_check(str(m.assembly.build["engine"]) != "", "M1: DRAG & DROP of an engine onto the stand works (engine = %s)" % m.assembly.build["engine"])
 	# the rest through the Install buttons
@@ -228,7 +229,7 @@ func _run() -> void:
 	var installs: Array = []
 	_collect_buttons(root, "M1_INSTALL", installs)
 	await _click(installs[1])
-	await _click_text("M1_SLOT_UPPER")
+	await _click_text("M1_TAB_UPPER")
 	await _frames(5)
 	installs.clear()
 	_collect_buttons(root, "M1_INSTALL", installs)
@@ -300,7 +301,7 @@ func _run() -> void:
 	m = await _wait_scene("constellation_launch")
 
 	# ============================================================ MISSION 4: Satellite Constellation
-	m = await _campaign_launch(m, "M4", [["M1_SLOT_ENGINE", 1], ["M1_SLOT_TANK", 1], ["M1_SLOT_UPPER", 0], ["M1_SLOT_BOOSTER", 0], ["M1_SLOT_NOSE", 0]], "mission4_ops")
+	m = await _campaign_launch(m, "M4", [["M1_SLOT_ENGINE", 1], ["M1_SLOT_TANK", 1], ["M1_TAB_UPPER", 0], ["M1_TAB_BOOSTER", 0], ["M1_SLOT_NOSE", 0]], "mission4_ops")
 	_check(m.mission_id == "m4_constellation", "M4: launch hand-off opens the deployment phase")
 	_check(await _click_text("BTN_START"), "M4: CLICK Start (deployment phase)")
 	await _frames(60)
@@ -311,7 +312,7 @@ func _run() -> void:
 	m = await _wait_scene("moon_launch")
 
 	# ============================================================ MISSION 5: Moon & Return
-	m = await _campaign_launch(m, "M5", [["M1_SLOT_ENGINE", 3], ["M1_SLOT_TANK", 3], ["M1_SLOT_UPPER", 3], ["M1_SLOT_NOSE", 0]], "mission5_ops", {"ascent": "m", "capsule": "heavy"})
+	m = await _campaign_launch(m, "M5", [["M1_SLOT_ENGINE", 3], ["M1_SLOT_TANK", 3], ["M1_TAB_UPPER", 3], ["M1_SLOT_NOSE", 0]], "mission5_ops", {"ascent": "m", "capsule": "heavy"})
 	_check(m.mission_id == "m5_moon", "M5: launch hand-off opens the lunar expedition")
 	_check(await _click_text("BTN_START"), "M5: CLICK Start (lunar expedition)")
 	await _frames(60)

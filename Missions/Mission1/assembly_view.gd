@@ -7,6 +7,7 @@ signal launch_requested(build: Dictionary)
 signal back_requested            # one step back: to the payload / satellite design
 signal missions_requested        # leave to the mission list
 
+const TAB_KEYS := {"upper": "M1_TAB_UPPER", "booster": "M1_TAB_BOOSTER"}      # short tab captions
 const REQUIRED := ["nose", "tank", "engine"]
 ## Safe starter rocket (not an optimal one): fairing + medium tank + Kestrel engine.
 const STARTER := {"nose": "std", "tank": "m", "engine": "kestrel"}
@@ -216,14 +217,30 @@ func _ready() -> void:
 	add_child(root)
 	var cols := UIKit.hbox(14)
 	root.add_child(cols)
-	cols.add_child(_build_left())
 	_canvas = PadCanvas.new()
 	_canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_canvas.scene3d = scene3d
 	_canvas.part_dropped.connect(_on_install)
-	cols.add_child(_canvas)
-	cols.add_child(_build_right())
+	cols.add_child(_canvas)                    # the rocket stands here (left), the designer is ONE wide panel (right)
+	var merged := UIKit.panel()
+	merged.custom_minimum_size = Vector2(800, 0)
+	var hb := UIKit.hbox(12)
+	merged.add_child(hb)
+	var lp := _build_left()
+	var rp := _build_right()
+	for pnl in [lp, rp]:
+		var flat := StyleBoxEmpty.new()
+		flat.content_margin_left = 4
+		flat.content_margin_right = 4
+		(pnl as PanelContainer).add_theme_stylebox_override("panel", flat)
+	lp.custom_minimum_size = Vector2(340, 0)
+	rp.custom_minimum_size = Vector2(420, 0)
+	rp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hb.add_child(lp)
+	hb.add_child(VSeparator.new())
+	hb.add_child(rp)
+	cols.add_child(merged)
 	_show_tab("engine")
 	if scene3d != null:
 		scene3d.set_build(build, true)
@@ -332,7 +349,8 @@ func _build_right() -> Control:
 	var group := ButtonGroup.new()
 	for slot in _tab_slots():
 		var b := Button.new()
-		b.text = SLOT_KEYS[slot]
+		b.text = TAB_KEYS.get(slot, SLOT_KEYS[slot])
+		b.add_theme_font_size_override("font_size", 16)
 		b.toggle_mode = true
 		b.button_group = group
 		b.focus_mode = Control.FOCUS_NONE

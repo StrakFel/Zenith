@@ -376,4 +376,7 @@ func _process(delta: float) -> void:
 	var el := deg_to_rad(9.0 + 2.0 * sin(_t * 0.2))
 	var dist: float = VIEW_DIST[_sel]
 	var pos := _cur_focus + Vector3(sin(az) * cos(el), sin(el), cos(az) * cos(el)) * dist
-	orbit.update(delta, pos, _cur_focus + Vector3(0, 2, 0), 42.0)
+	# the free area is between the mission list (left) and the info card (right): nudge the models left so they sit centred in it
+	var right := Vector3(cos(az), 0.0, -sin(az))
+	var shift := right * dist * 0.075
+	orbit.update(delta, pos + shift, _cur_focus + Vector3(0, 2, 0) + shift, 42.0)

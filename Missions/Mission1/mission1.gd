@@ -60,6 +60,7 @@ var profile: Dictionary = {}
 var profile_id := ""
 var payload_lab: PayloadLab
 var _handoff_started := false
+var auto_flight := true               # the autopilot flies the rocket (default); any control key or M takes over
 var guided := true                   # Guided Launch: pitch profile + next-step coach (key H toggles)
 var _guide_override_t := 0.0
 
@@ -262,8 +263,10 @@ func _update_assembly_camera(delta: float) -> void:
 	var h := pad_scene.rocket.total_height()
 	var az := deg_to_rad(28.0 + 20.0 * sin(_t_asm * 0.22))
 	var r := maxf(125.0, h * 2.3)
-	pad_scene.orbit.update(delta, center + Vector3(sin(az) * r, 6.0 + 2.0 * sin(_t_asm * 0.3), cos(az) * r),
-		center + Vector3(0, -2, 0), 36.0)
+	# the designer panel covers the right part of the screen: shift the view so the rocket stands in the free area (left)
+	var shift := Vector3(cos(az), 0.0, -sin(az)) * r * (0.34 if assembly != null else 0.0)
+	pad_scene.orbit.update(delta, center + Vector3(sin(az) * r, 6.0 + 2.0 * sin(_t_asm * 0.3), cos(az) * r) + shift,
+		center + Vector3(0, -2, 0) + shift, 36.0)
 
 
 ## Developer/test helper: build a rocket and go straight to the launch (skips the countdown).
@@ -352,7 +355,9 @@ func _on_launch(b: Dictionary) -> void:
 	hud.build()
 	flight.scene_design = design if profile.is_empty() else {}
 	guided = bool(GameState.settings["guided"])
+	auto_flight = bool(GameState.settings["autoflight"])
 	_guide_burn = false
+	hud.set_autopilot(auto_flight)
 	hud.set_guided(guided, _guide_pitch() if guided else NAN)
 	_ign_fx = false
 	_stuck_t = 0.0
@@ -466,11 +471,14 @@ func _autopilot(delta: float) -> void:
 	if ta_full > FlightModel.G_LIMIT * 0.95:
 		thr = minf(thr, FlightModel.G_LIMIT * 0.95 / ta_full)      # a competent pilot throttles down near burnout
 	model.throttle = thr
-	warp = 2 if h < 30000.0 else 4
+	if dev_autopilot:
+		warp = 2 if h < 30000.0 else 4
+	else:
+		_auto_warp()
 
 
 func _update_flight(delta: float) -> void:
-	if dev_autopilot:
+	if dev_autopilot or auto_flight:
 		_autopilot(delta)
 	else:
 		_manual_input(delta)
@@ -573,6 +581,8 @@ func _guide_step() -> Array:
 		return ["GUIDE_BURN", 6]
 	if h < 600.0:
 		return ["GUIDE_LIFTOFF", 1]
+	if model.vr < -10.0 and h < 90000.0 and pe < FlightModel.SAFE_PE and ap < _ap_target() * 0.97:
+		return ["GUIDE_FALL", 2]
 	return ["GUIDE_TURN", 2]
 
 
@@ -648,6 +658,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.keycode == KEY_F1:
 		cam_hint.toggle_help()
 		return
+	if state == S.FLIGHT and not dev_autopilot and hud != null:
+		if event.keycode == KEY_M:
+			_set_auto(not auto_flight)
+			return
+		if auto_flight and event.keycode in [KEY_W, KEY_S, KEY_A, KEY_D, KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_Z, KEY_X]:
+			_set_auto(false)       # the player touches a flight control: manual control, no questions asked
 	if event.keycode == KEY_H and (state == S.FLIGHT or state == S.COUNTDOWN) and hud != null:
 		guided = not guided
 		GameState.set_setting("guided", guided)
@@ -696,6 +712,11 @@ func _update_hint() -> void:
 		hud.set_hint("STG_HINT_BOOST_EMPTY", UIKit.C_BAD)
 	elif model.g_load > 0.9 * FlightModel.G_LIMIT:
 		hud.set_hint("M1_HINT_GLOAD", UIKit.C_WARN)
+	elif auto_flight:
+		var gk: Array = _guide_step()
+		var map := {"GUIDE_LIFTOFF": "AP_LIFTOFF", "GUIDE_TURN": "AP_TURN", "GUIDE_BOOST": "AP_SEP", "GUIDE_STAGE": "AP_SEP", "GUIDE_FAIRING": "AP_SEP",
+			"GUIDE_CUT": "AP_CUT", "GUIDE_COAST": "AP_COAST", "GUIDE_BURN": "AP_BURN", "GUIDE_ORBIT": "AP_ORBIT", "GUIDE_FALL": "AP_TURN"}
+		hud.set_hint(tr("AP_NOW") + " " + tr(str(map.get(str(gk[0]), "AP_TURN"))), UIKit.C_GOOD)
 	elif guided:
 		var g := _guide_step()
 		hud.set_hint(tr("GUIDE_STEP") % int(g[1]) + " " + tr(str(g[0])), UIKit.C_ACCENT if int(g[1]) != 7 else UIKit.C_GOOD)
@@ -773,6 +794,23 @@ func _do_separate() -> void:
 		_override_hint = "STG_SEP_SHOCK"
 		_override_t = 5.0
 	_ign_fx = false
+
+
+## Autopilot <-> manual. Handing control back re-synchronises the autopilot with where the flight is now.
+func _set_auto(on: bool) -> void:
+	if on == auto_flight:
+		return
+	auto_flight = on
+	hud.set_autopilot(on)
+	if on:
+		var o := model.orbit()
+		var ap := minf(float(o["ap"]), 1.0e9)
+		_ap_phase = 0 if ap < _ap_target() else (2 if model.vr < 15.0 else 1)
+		hud.notify(tr("AP_TOAST_ON"), UIKit.C_GOOD)
+	else:
+		_pitch_vel = 0.0
+		_guide_override_t = 0.0
+		hud.notify(tr("AP_TOAST_OFF"), UIKit.C_ORANGE)
 
 
 ## Short toast that says WHY an action is not available yet.

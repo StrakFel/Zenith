@@ -62,6 +62,7 @@ var _clock: Label
 var _att: Attitude
 var _assist: Label
 var _guide_lbl: Label
+var _auto_lbl: Label
 
 
 func build() -> void:
@@ -117,6 +118,10 @@ func build() -> void:
 	_assist.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_assist.custom_minimum_size.x = 150
 	av.add_child(_assist)
+	_auto_lbl = UIKit.label("HUD_AUTO_ON", 14, UIKit.C_GOOD, HORIZONTAL_ALIGNMENT_CENTER)
+	_auto_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_auto_lbl.custom_minimum_size.x = 150
+	av.add_child(_auto_lbl)
 	_guide_lbl = UIKit.label("HUD_GUIDE_ON", 13, UIKit.C_ACCENT, HORIZONTAL_ALIGNMENT_CENTER)
 	_guide_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_guide_lbl.custom_minimum_size.x = 150
@@ -227,6 +232,13 @@ func refresh(m: FlightModel, warp: int, assist: bool, mission_time: float) -> vo
 	_warp.text = "x%d" % warp
 	var sec := int(maxf(mission_time, 0.0))
 	_clock.text = "T+ %02d:%02d" % [sec / 60, sec % 60]
+
+
+## Autopilot / manual indicator on the attitude panel.
+func set_autopilot(on: bool) -> void:
+	_auto_lbl.text = "HUD_AUTO_ON" if on else "HUD_AUTO_OFF"
+	_auto_lbl.add_theme_color_override("font_color", UIKit.C_GOOD if on else UIKit.C_ORANGE)
+	_guide_lbl.visible = not on
 
 
 ## Guided launch indicator and the target-pitch ring on the attitude dial (NAN = no target).

@@ -80,6 +80,15 @@ func _build_site() -> void:
 	var apron := model.find_child("apron", true, false)
 	if apron is Node3D:
 		(apron as Node3D).scale = Vector3(1.8, 1.0, 1.8)          # 150 m -> 270 m concrete apron
+		# warm, matte concrete: no violet sheen from the sky reflection
+		var am := StandardMaterial3D.new()
+		am.albedo_color = Color(0.56, 0.5, 0.45)
+		am.roughness = 1.0
+		am.metallic_specular = 0.1
+		for ch in (apron as Node3D).find_children("*", "MeshInstance3D", true, false):
+			(ch as MeshInstance3D).material_override = am
+		if apron is MeshInstance3D:
+			(apron as MeshInstance3D).material_override = am
 	var site := Node3D.new()
 	add_child(site)
 	var concrete := Color(0.62, 0.6, 0.57)
@@ -93,11 +102,11 @@ func _build_site() -> void:
 	road.position = Vector3(0, -0.5, 0)
 	var ang := atan2(road_dir.x, road_dir.z)
 	road.rotation.y = ang
-	_box(road, Vector3(16.0, 0.35, 420.0), Vector3(0, -0.2, 220.0), dark, 0.8)
-	for k in 28:
+	_box(road, Vector3(16.0, 0.35, 300.0), Vector3(0, -0.2, 280.0), dark, 0.8)
+	for k in 20:
 		_box(road, Vector3(0.5, 0.05, 6.0), Vector3(0, 0.0, 135.0 + k * 11.0), paint, 0.7)        # centre dashes
 	for sx in [-1.0, 1.0]:
-		_box(road, Vector3(0.35, 0.05, 420.0), Vector3(sx * 7.6, 0.0, 220.0), warn, 0.7)              # edge lines
+		_box(road, Vector3(0.35, 0.05, 300.0), Vector3(sx * 7.6, 0.0, 280.0), warn, 0.7)              # edge lines
 	# painted markings on the apron: square guide line + landing-style numerals bars
 	for i in 4:
 		var r := Node3D.new()
@@ -116,13 +125,103 @@ func _build_site() -> void:
 		_box(site, Vector3(5.0, 2.2, 2.4), p, Color(0.9, 0.9, 0.92), 0.7)
 	for k in 6:
 		_box(site, Vector3(0.8, 0.5, 30.0), Vector3(14.0 + k * 1.6, -0.45, 70.0), Color(0.12, 0.12, 0.14), 0.9)
-	# the assembly building is a landmark: keep it, but make sure it visibly stands on the ground
-	var vab := model.find_child("vab", true, false)
-	# move the assembly building out of the hero camera's line of sight (it used to stand right behind the rocket)
+	# the old assembly-building box is removed for good (it read as a floating cube from many camera angles)
 	for nm in ["vab", "vab_door", "vab_stripe"]:
 		var vn := model.find_child(nm, true, false)
-		if vn is Node3D:
-			(vn as Node3D).position += Vector3(-100.0, -0.6, 520.0)
+		if vn != null:
+			vn.queue_free()
+	_build_details(site)
+
+
+func _cyl(parent: Node3D, radius: float, height: float, pos: Vector3, col: Color, horizontal := false, rough := 0.7) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = radius
+	cm.bottom_radius = radius
+	cm.height = height
+	cm.radial_segments = 20
+	mi.mesh = cm
+	var m := StandardMaterial3D.new()
+	m.albedo_color = col
+	m.roughness = rough
+	m.metallic = 0.2
+	mi.material_override = m
+	if horizontal:
+		mi.rotation_degrees = Vector3(0, 0, 90)
+		mi.position = pos + Vector3(0, radius, 0)
+	else:
+		mi.position = pos + Vector3(0, height * 0.5, 0)
+	parent.add_child(mi)
+	return mi
+
+
+## Variety for the launch site: tank farm, radar, water tower, hangars, container stacks, helipad, trucks, light posts.
+func _build_details(site: Node3D) -> void:
+	var white := Color(0.9, 0.9, 0.92)
+	var steel := Color(0.55, 0.58, 0.63)
+	var y0 := -0.5
+	# horizontal fuel tanks on cradles
+	for k in 3:
+		var base := Vector3(88.0, y0, -70.0 + k * 11.0)
+		_cyl(site, 3.2, 20.0, base + Vector3(0, 1.0, 0), white, true)
+		_box(site, Vector3(3.0, 1.2, 2.0), base + Vector3(-6.0, 0, 0), steel)
+		_box(site, Vector3(3.0, 1.2, 2.0), base + Vector3(6.0, 0, 0), steel)
+	# radar / comms mast with a dish
+	var rp := Vector3(-95.0, y0, -75.0)
+	_cyl(site, 0.5, 26.0, rp, steel)
+	var dish := MeshInstance3D.new()
+	var sm := SphereMesh.new()
+	sm.radius = 5.0
+	sm.height = 2.6
+	sm.radial_segments = 24
+	dish.mesh = sm
+	var dm := StandardMaterial3D.new()
+	dm.albedo_color = white
+	dm.roughness = 0.5
+	dish.material_override = dm
+	dish.position = rp + Vector3(0, 27.0, 0)
+	dish.rotation_degrees = Vector3(-60, 40, 0)
+	site.add_child(dish)
+	_cyl(site, 0.18, 8.0, rp + Vector3(0, 26.0, 0), steel)
+	# water tower
+	var wt := Vector3(110.0, y0, 60.0)
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			_cyl(site, 0.4, 14.0, wt + Vector3(sx * 3.0, 0, sz * 3.0), steel)
+	_cyl(site, 5.0, 7.0, wt + Vector3(0, 14.0, 0), Color(0.82, 0.84, 0.88))
+	_box(site, Vector3(10.4, 0.5, 10.4), wt + Vector3(0, 21.0, 0), steel)
+	# hangars in a row
+	for k in 3:
+		var hp := Vector3(-60.0 + k * 34.0, y0, 118.0)
+		_box(site, Vector3(28.0, 11.0, 18.0), hp, Color(0.74, 0.76, 0.8), 0.8)
+		_box(site, Vector3(28.4, 1.0, 18.4), hp + Vector3(0, 11.0, 0), Color(0.2, 0.32, 0.55), 0.7)
+		_box(site, Vector3(14.0, 8.0, 0.4), hp + Vector3(0, 0, -9.1), Color(0.35, 0.37, 0.4), 0.8)
+	# container stacks
+	var cols := [Color(0.2, 0.4, 0.75), Color(0.85, 0.45, 0.12), Color(0.88, 0.88, 0.9), Color(0.3, 0.55, 0.4)]
+	for i in 8:
+		var cp := Vector3(48.0 + (i % 4) * 7.0, y0, 100.0 + (i / 4) * 3.4)
+		_box(site, Vector3(6.4, 2.6, 2.5), cp, cols[i % 4], 0.7)
+		if i % 3 == 0:
+			_box(site, Vector3(6.4, 2.6, 2.5), cp + Vector3(0, 2.6, 0), cols[(i + 1) % 4], 0.7)
+	# helipad
+	var hpad := Vector3(-118.0, y0, 20.0)
+	_cyl(site, 9.0, 0.3, hpad, Color(0.3, 0.31, 0.34))
+	_box(site, Vector3(1.0, 0.06, 7.0), hpad + Vector3(-2.5, 0.3, 0), white)
+	_box(site, Vector3(1.0, 0.06, 7.0), hpad + Vector3(2.5, 0.3, 0), white)
+	_box(site, Vector3(6.0, 0.06, 1.0), hpad + Vector3(0, 0.3, 0), white)
+	# service trucks
+	for p in [Vector3(-20, y0, 60), Vector3(-14, y0, 63), Vector3(40, y0, 48)]:
+		_box(site, Vector3(6.0, 2.6, 2.6), p, Color(0.92, 0.92, 0.94), 0.7)
+		_box(site, Vector3(2.2, 2.0, 2.6), p + Vector3(4.0, 0, 0), Color(0.9, 0.55, 0.12), 0.7)
+	# light posts along the road and the apron
+	for k in 10:
+		var lp := Vector3(-22.0 - k * 16.0, y0, 18.0 + k * 11.0)
+		_cyl(site, 0.18, 10.0, lp, steel)
+		_box(site, Vector3(1.6, 0.4, 0.8), lp + Vector3(0, 10.0, 0), Color(1.0, 0.9, 0.7), 0.4, 1.0)
+	# perimeter fence posts
+	for k in 28:
+		var fp := Vector3(-130.0 + k * 9.3, y0, -128.0)
+		_cyl(site, 0.12, 2.4, fp, steel)
 
 
 func _build_particles() -> void:

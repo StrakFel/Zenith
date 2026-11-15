@@ -79,6 +79,13 @@ func setup(design: Dictionary, sat: Dictionary, rk: Dictionary, rocket: Dictiona
 		row.add_child(bar)
 		row.add_child(UIKit.label("%d%%" % int(r * 100.0), 14, Color.WHITE))
 		body.add_child(row)
+	var af := CheckButton.new()
+	af.text = "SUM_AUTOFLIGHT"
+	af.name = "AutoflightCheck"
+	af.button_pressed = bool(GameState.settings["autoflight"])
+	af.focus_mode = Control.FOCUS_NONE
+	af.toggled.connect(func(on: bool): GameState.set_setting("autoflight", on))
+	body.add_child(af)
 	var gl := CheckButton.new()
 	gl.text = "SUM_GUIDED"
 	gl.name = "GuidedCheck"

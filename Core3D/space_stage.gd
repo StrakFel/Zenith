@@ -145,9 +145,9 @@ func set_look(kind: String) -> void:
 	_blend_dawn = (kind == "dawn")
 	match kind:
 		"dawn":
-			base_zenith = Color(0.07, 0.15, 0.40)
-			base_horizon = Color(1.0, 0.60, 0.34)
-			sun_color = Color(1.0, 0.62, 0.38)
+			base_zenith = Color(0.20, 0.25, 0.37)     # greyish blue: no violet band where it meets the orange horizon
+			base_horizon = Color(1.0, 0.67, 0.42)
+			sun_color = Color(1.0, 0.64, 0.40)
 			sun_to = Vector3(-0.62, 0.12, 0.78).normalized()
 			haze = 1.6
 		"dusk":
@@ -208,8 +208,8 @@ func _apply_altitude(h: float) -> void:
 	if _blend_dawn:
 		# the sun climbs and the sky turns blue while the rocket leaves the pad
 		var t := smoothstep(300.0, 9000.0, h)
-		base_zenith = Color(0.07, 0.15, 0.40).lerp(Color(0.10, 0.28, 0.68), t)
-		base_horizon = Color(1.0, 0.60, 0.34).lerp(Color(0.62, 0.78, 0.95), t)
+		base_zenith = Color(0.20, 0.25, 0.37).lerp(Color(0.10, 0.28, 0.68), t)
+		base_horizon = Color(1.0, 0.67, 0.42).lerp(Color(0.62, 0.78, 0.95), t)
 		sun_color = Color(1.0, 0.62, 0.38).lerp(Color(1.0, 0.88, 0.72), t)
 		var st := Vector3(-0.62, 0.12, 0.78).lerp(Vector3(-0.55, 0.42, 0.72), t).normalized()
 		if not st.is_equal_approx(sun_to):

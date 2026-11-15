@@ -84,6 +84,7 @@ func _run() -> void:
 	_gs.progress.clear()
 	_gs.settings["unlock_all"] = false
 	_gs.settings["guided"] = true
+	_gs.settings["autoflight"] = false
 
 	# ---------------------------------------------------------------- Demo Mode: Play opens the mission list
 	_gs.settings["unlock_all"] = true
@@ -196,5 +197,41 @@ func _run() -> void:
 			break
 		await process_frame
 	_check(m.ended and m.last_success, "guided flight ends with a successful mission (stars %d)" % m.last_stars)
+	# ---------------------------------------------------------------- default autopilot: no input at all reaches orbit
+	_gs.settings["autoflight"] = true
+	_router.go_to("res://Missions/Mission1/mission1.tscn")
+	m = await _wait_scene("mission1")
+	m.dev_skip_briefing()
+	m._on_design_done({"goal": "earth", "instrument": "img_s", "solar": "m", "battery": "m", "comm": "x"})
+	m.state = m.S.REVIEW
+	m._on_launch({"nose": "std", "tank": "m", "engine": "kestrel", "upper": "u_s", "booster": ""})
+	m.flight.skip_intro()
+	_check(m.auto_flight, "autopilot is on by default")
+	Engine.time_scale = 4.0
+	frames = 0
+	while frames < 60000 and not m.ended:
+		frames += 1
+		await process_frame
+	Engine.time_scale = 1.0
+	_check(m.ended and m.last_success and m.auto_flight, "autopilot alone (no key pressed) completes the mission (stars %d)" % m.last_stars)
+
+	# ---------------------------------------------------------------- take-over by a control key
+	_router.go_to("res://Missions/Mission1/mission1.tscn")
+	m = await _wait_scene("mission1")
+	m.dev_skip_briefing()
+	m._on_design_done({"goal": "earth", "instrument": "img_s", "solar": "m", "battery": "m", "comm": "x"})
+	m.state = m.S.REVIEW
+	m._on_launch({"nose": "std", "tank": "m", "engine": "kestrel", "upper": "u_s", "booster": ""})
+	m.flight.skip_intro()
+	for i in 600:
+		await process_frame
+		if m.state == m.S.FLIGHT:
+			break
+	await _frames(60)
+	await _key(KEY_D)
+	_check(m.state == m.S.FLIGHT and not m.auto_flight, "pressing a steering key takes manual control")
+	await _key(KEY_M)
+	_check(m.auto_flight, "M hands control back to the autopilot")
+
 	print("\nRESULT: ", "ALL PASSED" if _fail == 0 else "%d FAILED" % _fail)
 	quit(_fail)

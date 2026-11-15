@@ -48,9 +48,9 @@ func setup(mission_mode: bool, top: float = -1.0, right: bool = false) -> void:
 func _layout() -> void:
 	if _bottom:
 		# assembly screens: between the side panels at the bottom, never over the part tabs / cards
-		_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-		_panel.offset_left = -290
-		_panel.offset_right = -82
+		_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+		_panel.offset_left = 16
+		_panel.offset_right = 330
 		_panel.offset_bottom = -12
 		_panel.offset_top = -12
 		_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
@@ -111,7 +111,7 @@ func set_mission_mode(on: bool, top: float = -2.0) -> void:
 func set_bottom(on: bool, seconds: float = 0.0) -> void:
 	_bottom = on
 	if on:
-		_label.custom_minimum_size.x = 188.0
+		_label.custom_minimum_size.x = 292.0
 	_layout()
 	_panel.modulate.a = 1.0
 	_user_hidden = false
