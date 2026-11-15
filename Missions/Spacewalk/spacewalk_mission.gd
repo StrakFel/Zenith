@@ -1,4 +1,4 @@
-﻿extends MissionBase
+extends MissionBase
 ## Mission 2 - Spacewalk. Fly the astronaut (inertia!) to a damaged satellite, repair
 ## three components, then return to the airlock slowly enough to enter it.
 
@@ -28,8 +28,16 @@ var _health_bars: Array[ProgressBar] = []
 var _sci_lbl: Label
 
 
+var ops_launch: Dictionary = {}     # launch hand-off of Mission 2 (empty = stand-alone EVA training)
+var ops_design: Dictionary = {}
+
+
 func _init() -> void:
 	mission_id = "eva_training"
+	if str(GameState.session.get("profile", "")) == "m2":
+		mission_id = "m2_space_ops"
+		ops_launch = GameState.session["launch"]
+		ops_design = GameState.session["design"]
 
 
 func _briefing_data() -> Dictionary:
@@ -56,12 +64,30 @@ func _build_mission() -> void:
 	view = SpacewalkView3D.new()
 	add_child(view)
 	view.setup(world)
+	_apply_launch()
 	world.repaired.connect(_on_repaired)
 	world.suit_hit.connect(_on_suit_hit)
 	hud_layer = CanvasLayer.new()
 	hud_layer.layer = 5
 	add_child(hud_layer)
 	_build_hud()
+
+
+## The EVA package chosen in the payload lab sets the resources; a rough launch damages the equipment.
+func _apply_launch() -> void:
+	if ops_launch.is_empty():
+		return
+	var o2: Dictionary = LaunchProfiles.EVA_O2[ops_design["o2"]]
+	var n2: Dictionary = LaunchProfiles.EVA_N2[ops_design["n2"]]
+	var su: Dictionary = LaunchProfiles.EVA_SUIT[ops_design["suit"]]
+	var q := clampf(float(ops_launch["hull"]) / 100.0, 0.0, 1.0)
+	var cond := lerpf(0.8, 1.0, q)                 # equipment condition after the ride to orbit
+	world.o2_cap = SpacewalkWorld.O2_MAX * float(o2["k"]) * cond
+	world.fuel_cap = SpacewalkWorld.FUEL_MAX * float(n2["k"]) * cond
+	world.o2 = world.o2_cap
+	world.fuel = world.fuel_cap
+	world.suit_k = float(su["k"])
+	world.suit = 100.0 if q >= 0.9 else 60.0 + 40.0 * q
 
 
 func _build_hud() -> void:
@@ -255,8 +281,8 @@ func _update_hud() -> void:
 		hb.value = 100.0 if world.done[i] else 15.0 + 40.0 * world.progress[i]
 		UIKit.set_bar_color(hb, UIKit.C_GOOD if world.done[i] else UIKit.C_BAD)
 	_sci_lbl.text = "%s: %d%%" % [tr("M2_H_SCI"), int(_science() * 100.0)]
-	_o2_bar.value = world.o2 / SpacewalkWorld.O2_MAX * 100.0
-	_fuel_bar.value = world.fuel / SpacewalkWorld.FUEL_MAX * 100.0
+	_o2_bar.value = world.o2 / world.o2_cap * 100.0
+	_fuel_bar.value = world.fuel / world.fuel_cap * 100.0
 	_suit_bar.value = world.suit
 	UIKit.set_bar_color(_o2_bar, UIKit.C_BAD if world.o2 < 60.0 else UIKit.C_ACCENT)
 	UIKit.set_bar_color(_fuel_bar, UIKit.C_BAD if world.fuel < 10.0 else UIKit.C_ORANGE)
@@ -319,7 +345,7 @@ func _stats() -> Array:
 	return [
 		["R_SCI_RESTORED", "%d%%" % int(_science() * 100.0)],
 		["R_REPAIRS", "%d / 3" % (int(world.done[0]) + int(world.done[1]) + int(world.done[2]))],
-		["R_FUEL_LEFT", "%d%%" % int(world.fuel / SpacewalkWorld.FUEL_MAX * 100.0)],
+		["R_FUEL_LEFT", "%d%%" % int(world.fuel / world.fuel_cap * 100.0)],
 		["R_O2_LEFT", "%d:%02d" % [int(world.o2) / 60, int(world.o2) % 60]],
 		["R_SUIT", "%d%%" % int(world.suit)],
 	]
@@ -327,32 +353,45 @@ func _stats() -> Array:
 
 func _win() -> void:
 	var stars := 1
-	if world.fuel / SpacewalkWorld.FUEL_MAX >= 0.3:
+	if world.fuel / world.fuel_cap >= 0.3:
 		stars += 1
-	if world.o2 / SpacewalkWorld.O2_MAX >= 0.35 and world.suit >= 90.0:
+	if world.o2 / world.o2_cap >= 0.35 and world.suit >= 90.0:
 		stars += 1
 	var score := stars * 1000 + int(world.fuel * 10.0) + int(world.o2 * 2.0) + int(world.suit * 3.0)
 	var s := _stats()
 	s.append(["R_SCORE", str(score)])
 	var tips: Array = []
-	if world.fuel / SpacewalkWorld.FUEL_MAX < 0.3:
+	if world.fuel / world.fuel_cap < 0.3:
 		tips.append("M2_TIP_FUEL")
 	if world.suit < 90.0:
 		tips.append("M2_TIP_SUIT")
-	if world.o2 / SpacewalkWorld.O2_MAX < 0.35:
+	if world.o2 / world.o2_cap < 0.35:
 		tips.append("M2_TIP_O2")
 	if tips.is_empty():
 		tips.append("M2_TIP_GOOD")
 	var sci := _science()
-	var extra := {
-		"segments": [["SEG_SPACE", clampf(float(world.suit) / 100.0, 0.0, 1.0)],
+	var segs: Array = []
+	if not ops_launch.is_empty():
+		segs.append(["SEG_LAUNCH", _launch_rating()])
+		s.append(["R_BUDGET_USED", "%s / %s" % [Units.money(int(ops_launch["cost"])), Units.money(int(ops_launch["budget"]))]])
+		s.append(["R_LAUNCH_HULL", "%d%%" % int(ops_launch["hull"])])
+	segs.append_array([["SEG_SPACE", clampf(float(world.suit) / 100.0, 0.0, 1.0)],
 			["SEG_GROUND", 0.2 + 0.8 * float(world.done[1])],
-			["SEG_USER", sci]],
+			["SEG_USER", sci]])
+	var extra := {
+		"segments": segs,
 		"science": sci, "science_note": "M2_SCI_NOTE", "tips": tips,
 		"user": "USER_EARTH_%d" % M1Design.science_tier(sci),
 	}
 	Sfx.stop_all_loops()
 	finish(true, stars, score, s, "M2_WIN_REASON", 0.8, extra)
+
+
+func _launch_rating() -> float:
+	var l := ops_launch
+	var r := float(l["hull"]) / 100.0 * 0.6 + float(l["orbit_q"]) * 0.25 + (0.15 if not bool(l["fairing_early"]) else 0.0)
+	r *= 1.0 - clampf(float(l["waste"]) * 0.3 + float(l["booster_waste"]) * 0.2, 0.0, 0.3)
+	return clampf(r, 0.0, 1.0)
 
 
 func _lose(reason: String) -> void:

@@ -84,10 +84,11 @@ func sync() -> void:
 	scene.set_flight(model.altitude(), model.theta, model.pitch)
 
 
-func update_fx(thr: float, ambient: float, drift: Vector3) -> void:
+func update_fx(thr: float, ambient: float, drift: Vector3, booster_thr: float = 0.0) -> void:
 	if rocket_hidden:
 		return
 	scene.rocket.set_thrust(thr, ambient, drift)
+	scene.rocket.booster_level = booster_thr
 	var pad_level := thr * (1.0 - smoothstep(0.0, 220.0, model.altitude()))
 	scene.pad.set_blast(pad_level)
 	# speed streaks (only meaningful in air)
@@ -187,6 +188,32 @@ func separate_stage() -> void:
 	_flash.light_energy = 22.0
 	create_tween().tween_property(_flash, "light_energy", 0.0, 0.9)
 	shake_amp = maxf(shake_amp, 5.0)
+	_sep_cam = 2.8
+
+
+## Strap-on booster separation: the boosters swing outwards, tumble and fade while small separation motors fire.
+func separate_boosters() -> void:
+	var rk := scene.rocket
+	if not rk.has_boosters_attached():
+		return
+	var axis := scene.rocket_pivot.global_transform.basis.y.normalized()
+	var at := rk.stage_interface_world()
+	var base := scene.rocket_pivot.global_position
+	var holder := rk.separate_boosters(scene)
+	if holder == null:
+		return
+	for k in holder.get_children():
+		var n3 := k as Node3D
+		var radial := (n3.global_position - base)
+		radial -= axis * radial.dot(axis)
+		var dir := radial.normalized() if radial.length() > 0.01 else Vector3.RIGHT
+		_spent.append({"n": n3, "v": dir * 6.0 - axis * 2.5, "w": Vector3(0.12, 0.05, dir.x * 0.35 + 0.15), "t": 0.0})
+		Fx3D.burst(scene, n3.global_position, Color(1.0, 0.8, 0.5), 28, 14.0, 1.4, 0.8)
+	Fx3D.burst(scene, at, Color(1.0, 0.9, 0.7), 60, 20.0, 1.8, 0.9)
+	_flash.global_position = at
+	_flash.light_energy = 24.0
+	create_tween().tween_property(_flash, "light_energy", 0.0, 0.9)
+	shake_amp = maxf(shake_amp, 5.5)
 	_sep_cam = 2.8
 
 

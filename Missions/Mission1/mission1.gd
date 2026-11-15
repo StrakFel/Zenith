@@ -55,13 +55,39 @@ var _anom_end := -1.0
 var anomaly_seen := false
 var last_prox: Dictionary = {}   # Mission Success Proximity of the finished flight (read by tests)
 var _ap_phase := 0
+## Launch profile (Missions 2-5 reuse this scene as their launch segment; empty = Mission 1 with its satellite).
+var profile: Dictionary = {}
+var profile_id := ""
+var payload_lab: PayloadLab
+var _handoff_started := false
 
 
 func _init() -> void:
 	mission_id = "m1_launch"
+	M1Parts.active_budget = M1Parts.BUDGET
+	M1Parts.active_mission = 1
+	M1Parts.active_required_dv = M1Parts.REQUIRED_DV
+
+
+## Called by the subclasses of Missions 2-5 from _init(): configures this launch segment from a LaunchProfile.
+func _setup_profile(id: String) -> void:
+	profile_id = id
+	profile = LaunchProfiles.get_profile(id)
+	mission_id = str(profile["mission_id"])
+	M1Parts.active_budget = int(profile["budget"])
+	M1Parts.active_mission = int(profile["index"])
 
 
 func _briefing_data() -> Dictionary:
+	if not profile.is_empty():
+		return {
+			"title": str(profile["title"]),
+			"objectives": ["%s_OBJ_GOAL" % profile_id.to_upper(), "PRF_OBJ_LAB", "PRF_OBJ_ROCKET", "PRF_OBJ_FLY", "%s_OBJ_OPS" % profile_id.to_upper()],
+			"controls": [
+				["MOUSE", "M1_CTRL_DRAG"], ["W S", "M1_CTRL_THROTTLE"], ["A D", "M1_CTRL_PITCH"], ["Z X", "M1_CTRL_FULLCUT"],
+				["G", "M1_CTRL_STAGE"], ["B", "M1_CTRL_BOOSTERS"], ["F", "M1_CTRL_FAIRING"], ["1 2 3", "M1_CTRL_WARP"],
+				["SPACE", "PRF_CTRL_HANDOFF"], ["ESC", "M1_CTRL_PAUSE"]],
+		}
 	return {
 		"title": "M1_TITLE",
 		"objectives": ["M1_OBJ_1", "M1_OBJ_2", "M1_OBJ_3", "M1_OBJ_4", "M1_OBJ_5"],
@@ -105,6 +131,13 @@ func _on_orbit_engaged(on: bool) -> void:
 
 
 func _on_mission_start() -> void:
+	if not profile.is_empty():
+		cam_hint.set_hud_corner(true)      # keep the camera hint clear of the wide lab panel
+		payload_lab = PayloadLab.new()
+		payload_lab.profile_id = profile_id
+		world_layer.add_child(payload_lab)
+		payload_lab.design_done.connect(_on_design_done)
+		return
 	design_view = MissionDesignView.new()
 	world_layer.add_child(design_view)
 	design_view.design_done.connect(_on_design_done)
@@ -113,7 +146,11 @@ func _on_mission_start() -> void:
 ## Step 1-2 finished: the satellite is designed, now design the rocket for it.
 func _on_design_done(d: Dictionary) -> void:
 	design = d
-	sat = M1Design.sat_stats(design)
+	sat = M1Design.sat_stats(design) if profile.is_empty() else LaunchProfiles.payload_stats(profile_id, design)
+	if payload_lab != null:
+		payload_lab.queue_free()
+		payload_lab = null
+		cam_hint.set_hud_corner(false)
 	if design_view != null:
 		design_view.queue_free()
 		design_view = null
@@ -137,7 +174,10 @@ func _on_review_request(b: Dictionary) -> void:
 	assembly.visible = false
 	review = DesignReview.new()
 	world_layer.add_child(review)
-	review.setup(design, stats)
+	if profile.is_empty():
+		review.setup(design, stats)
+	else:
+		review.setup_reqs(LaunchProfiles.requirements(profile_id, design, stats), M1Parts.can_launch(stats))
 	review.back_requested.connect(func():
 		review.queue_free()
 		assembly.visible = true
@@ -149,6 +189,9 @@ func _on_review_request(b: Dictionary) -> void:
 
 ## Final Mission Summary: everything that was decided, in one place, before the countdown.
 func _show_summary() -> void:
+	if not profile.is_empty():
+		_on_launch(build)
+		return
 	summary = MissionSummary.new()
 	world_layer.add_child(summary)
 	summary.setup(design, sat, build, stats)
@@ -274,7 +317,7 @@ func _on_launch(b: Dictionary) -> void:
 	hud = FlightHud.new()
 	hud_layer.add_child(hud)
 	hud.build()
-	flight.scene_design = design
+	flight.scene_design = design if profile.is_empty() else {}
 	_ign_fx = false
 	_stuck_t = 0.0
 	fairing_late = false
@@ -282,6 +325,7 @@ func _on_launch(b: Dictionary) -> void:
 	hud_layer.add_child(stage_panel)
 	stage_panel.setup(model)
 	stage_panel.separate_requested.connect(_do_separate)
+	stage_panel.boosters_requested.connect(_do_boosters)
 	stage_panel.fairing_requested.connect(_do_fairing)
 	cam_hint.set_compact(false)
 	cam_hint.set_hud_corner(true)
@@ -347,8 +391,16 @@ func _shake_factor() -> float:
 
 
 ## Test autopilot (Tools/e2e_m1.gd): same logic as a competent player.
+func _ap_target() -> float:
+	if not profile.is_empty():
+		return float(profile["ap_target"])
+	return float(M1Design.GOALS[design.get("goal", "earth")].get("ap_target", 115000.0))
+
+
 func _autopilot(delta: float) -> void:
 	var h := model.altitude()
+	if model.has_boosters and model.b_fuel <= 1.0:
+		_do_boosters()
 	if model.has_upper and model.stage == 1 and model.fuel <= 1.0:
 		_do_separate()
 	if model.fairing_on and h >= 95000.0:
@@ -358,7 +410,7 @@ func _autopilot(delta: float) -> void:
 	var thr := 1.0 if model.q < 0.8 * FlightModel.Q_LIMIT else 0.55
 	if _ap_phase == 0:
 		model.pitch = 0.0 if h < 600.0 else deg_to_rad(90.0 * minf(1.0, pow((h - 600.0) / 60000.0, 0.5)))
-		if ap >= float(M1Design.GOALS[design.get("goal", "earth")].get("ap_target", 115000.0)):
+		if ap >= _ap_target():
 			_ap_phase = 1
 	if _ap_phase == 1:
 		thr = 0.0
@@ -475,7 +527,7 @@ func _simulate(delta: float) -> void:
 		if _stuck_t > 30.0:
 			_fail("STG_FAIL_STUCK", false)
 			return
-	if model.fuel <= 0.0 and not model.in_stable_orbit() and not (model.has_upper and model.stage == 1):
+	if model.fuel <= 0.0 and not model.in_stable_orbit() and not (model.has_upper and model.stage == 1) and not (model.has_boosters and model.b_fuel > 0.0):
 		var o := model.orbit()
 		if not bool(o["bound"]) or float(o["pe"]) < FlightModel.SAFE_PE:
 			_fuel_out_t += delta
@@ -504,6 +556,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	match event.keycode:
 		KEY_G:
 			_do_separate()
+		KEY_B:
+			_do_boosters()
 		KEY_F:
 			_do_fairing()
 		KEY_T:
@@ -532,6 +586,8 @@ func _update_hint() -> void:
 		hud.set_hint("M1_HINT_ORBIT", UIKit.C_GOOD)
 	elif model.q > 0.85 * FlightModel.Q_LIMIT:
 		hud.set_hint("M1_HINT_MAXQ", UIKit.C_BAD)
+	elif model.has_boosters and model.b_fuel <= 0.0:
+		hud.set_hint("STG_HINT_BOOST_EMPTY", UIKit.C_BAD)
 	elif model.g_load > 0.9 * FlightModel.G_LIMIT:
 		hud.set_hint("M1_HINT_GLOAD", UIKit.C_WARN)
 	elif model.has_upper and model.stage == 1 and model.fuel <= 0.0:
@@ -566,7 +622,10 @@ func _update_fx() -> void:
 	var drift := Vector3(-model.vt, -model.vr * 0.0 - model.vr, 0.0) * 0.5
 	if drift.length() > 600.0:
 		drift = drift.normalized() * 600.0
-	flight.update_fx(thr, clampf(rho / 0.9, 0.0, 1.0), drift)
+	var b_thr := 0.0
+	if model.has_boosters and model.b_fuel > 0.0 and state != S.ENDED:
+		b_thr = model.throttle if state != S.COUNTDOWN or _cd >= COUNTDOWN_LEN - 3.0 else 0.0
+	flight.update_fx(thr, clampf(rho / 0.9, 0.0, 1.0), drift, b_thr)
 	# engine rumble follows throttle; it gets thinner in vacuum. Max-Q warning alarm.
 	if thr > 0.02 and state != S.ENDED:
 		Sfx.loop("rumble", lerpf(-26.0, -4.0, thr) - 10.0 * (1.0 - clampf(rho / 0.9, 0.0, 1.0)), 0.85 + 0.3 * thr)
@@ -604,6 +663,23 @@ func _do_separate() -> void:
 	_ign_fx = false
 
 
+## BOOSTER SEPARATION (B / panel button): drops the strap-on boosters. Dropping them while they still burn wastes propellant,
+## carrying them empty is dead weight, separating near Max-Q shocks the vehicle.
+func _do_boosters() -> void:
+	if state != S.FLIGHT or inspecting or not model.has_boosters:
+		return
+	var r := model.separate_boosters()
+	if not bool(r.get("ok", false)):
+		return
+	flight.separate_boosters()
+	Sfx.play("clang", -2.0)
+	Sfx.play("whoosh", -6.0)
+	hud.notify(tr("STG_TOAST_BOOST"), UIKit.C_ORANGE)
+	if float(r["shock"]) > 1.0:
+		_override_hint = "STG_SEP_SHOCK"
+		_override_t = 5.0
+
+
 ## FAIRING SEPARATION (F / panel button): sheds the nose fairing mass; in dense air the exposed payload is damaged.
 func _do_fairing() -> void:
 	if state != S.FLIGHT or inspecting or not model.fairing_on:
@@ -637,8 +713,11 @@ func _try_deploy() -> void:
 	Sfx.loop_stop("alarm")
 	Sfx.play("whoosh", -4.0)
 	hud.set_hint("M1_HINT_DEPLOYING", UIKit.C_ACCENT)
-	await flight.deploy_satellite(5.0, design)
+	await flight.deploy_satellite(5.0, design if profile.is_empty() else {})
 	if ended:
+		return
+	if not profile.is_empty():
+		_handoff()
 		return
 	await _downlink()
 	if ended:
@@ -758,7 +837,7 @@ func _succeed() -> void:
 
 ## Builds the "proximity" block for the result screen from the REAL flight state and stores the personal best.
 func _proximity_extra(orbit_ok: bool, success: bool, stars: int, score: int) -> Dictionary:
-	if design.is_empty() or stats.is_empty():
+	if design.is_empty() or stats.is_empty() or not profile.is_empty():
 		return {}
 	var o := model.orbit()
 	var flight := {"orbit_ok": orbit_ok, "ap": minf(float(o["ap"]), 1.0e9), "pe": float(o["pe"]), "integrity": model.integrity,
@@ -776,8 +855,43 @@ func _proximity_extra(orbit_ok: bool, success: bool, stars: int, score: int) -> 
 	return prox
 
 
+## Launch segment done (Missions 2-5): remember how the launch went and continue with the operations phase.
+func _handoff() -> void:
+	if _handoff_started:
+		return
+	_handoff_started = true
+	state = S.ENDED
+	if stage_panel != null:
+		stage_panel.visible = false
+	var o := model.orbit()
+	var mean_km := (float(o["ap"]) + float(o["pe"])) * 0.5 / 1000.0
+	var m_now := model.mass()
+	var dv_left := 0.0
+	if model.fuel > 0.0 and model.isp_vac > 0.0 and m_now > model.fuel:
+		dv_left = model.isp_vac * FlightModel.G0 * log(m_now / (m_now - model.fuel))
+	var best: Array = profile["best"]
+	var ok: Array = profile["ok"]
+	var launch := {
+		"hull": model.integrity, "fuel_frac": model.fuel_fraction(), "dv_left": dv_left, "mass_left": m_now,
+		"ap": float(o["ap"]), "pe": float(o["pe"]), "mean_km": mean_km, "orbit_q": M1Design.window_score(mean_km, best, ok),
+		"rel": float(stats["rel"]), "cost": int(stats["cost"]), "budget": int(profile["budget"]),
+		"waste": maxf(model.sep_waste, 0.0), "booster_waste": maxf(model.b_waste, 0.0),
+		"fairing_early": model.fairing_early, "fairing_late": fairing_late, "anomaly": anomaly_seen,
+		"dead_time": model.dead_mass_time + model.b_dead_time, "max_q": model.max_q_seen / FlightModel.Q_LIMIT,
+		"time": model.time,
+	}
+	GameState.session = {"profile": profile_id, "design": design, "launch": launch, "payload": sat, "stats": stats}
+	hud.set_hint("PRF_HINT_HANDOFF", UIKit.C_GOOD)
+	hud.notify(tr("PRF_TOAST_ORBIT"), UIKit.C_GOOD)
+	Sfx.stop_all_loops()
+	await get_tree().create_timer(2.2).timeout
+	Router.go_to(str(profile["next"]))
+
+
 func _staging_text() -> String:
 	var parts: Array[String] = []
+	if model.b_waste >= 0.0:
+		parts.append(tr("R_BST_WASTE") % int(model.b_waste * 100.0))
 	if model.has_upper:
 		parts.append(tr("R_STG_WASTE") % int(maxf(model.sep_waste, 0.0) * 100.0))
 	if model.fairing_early:

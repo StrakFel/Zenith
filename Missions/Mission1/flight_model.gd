@@ -36,6 +36,18 @@ var upper_isp_sl := 255.0
 var upper_isp_vac := 380.0
 var fairing_mass := 0.0
 var fairing_on := true
+# strap-on boosters
+var has_boosters := false
+var b_fuel := 0.0
+var b_fuel_cap := 0.0
+var b_dry := 0.0
+var b_thrust := 0.0
+var b_isp_sl := 240.0
+var b_isp_vac := 265.0
+var b_waste := -1.0             # fraction of booster propellant thrown away at separation (-1 = not separated)
+var b_sep_time := -1.0
+var b_thrust_now := 0.0
+var b_dead_time := 0.0          # seconds the EMPTY boosters were carried as dead weight
 var ignite_in := 0.0            # seconds until the next engine lights after separation
 var sep_waste := -1.0           # fraction of stage-1 propellant thrown away unused at separation (-1 = not separated)
 var sep_time := -1.0
@@ -74,6 +86,14 @@ func setup(stats: Dictionary) -> void:
 	isp_vac = float(stats["isp_vac"])
 	cd = float(stats["cd"])
 	stage = 1
+	has_boosters = int(stats.get("boosters", 0)) > 0
+	if has_boosters:
+		b_fuel = float(stats["b_fuel"])
+		b_fuel_cap = b_fuel
+		b_dry = float(stats["b_dry"])
+		b_thrust = float(stats["b_thrust"])
+		b_isp_sl = float(stats["b_isp_sl"])
+		b_isp_vac = float(stats["b_isp_vac"])
 	has_upper = int(stats.get("stages", 1)) == 2
 	reserve_fuel = float(stats.get("reserve", 0.0))
 	stage1_dry = float(stats.get("stage1_dry", 0.0))
@@ -86,7 +106,7 @@ func setup(stats: Dictionary) -> void:
 
 
 func mass() -> float:
-	return dry_mass + fuel + reserve_fuel
+	return dry_mass + fuel + reserve_fuel + b_fuel
 
 
 func altitude() -> float:
@@ -135,6 +155,22 @@ func jettison_fairing() -> Dictionary:
 	return {"ok": true, "damage": dmg, "early": fairing_early}
 
 
+## Drop the (usually empty) strap-on boosters. Separating while they still burn throws propellant away; in dense air
+## near Max-Q the separation is violent. Returns {"ok", "waste", "shock"}.
+func separate_boosters() -> Dictionary:
+	if not has_boosters:
+		return {"ok": false}
+	b_waste = b_fuel / b_fuel_cap if b_fuel_cap > 0.0 else 0.0
+	b_sep_time = time
+	var shock := clampf(q / Q_LIMIT - 0.35, 0.0, 1.0) * 35.0
+	dry_mass -= b_dry
+	b_fuel = 0.0
+	has_boosters = false
+	b_thrust_now = 0.0
+	integrity = maxf(integrity - shock, 1.0)
+	return {"ok": true, "waste": b_waste, "shock": shock}
+
+
 func current_cd() -> float:
 	return cd + (0.0 if fairing_on else CD_NO_FAIRING)
 
@@ -162,6 +198,8 @@ func step(dt: float) -> void:
 			engine_on = true
 	if fuel <= 0.0 and has_upper and stage == 1:
 		dead_mass_time += dt
+	if has_boosters and b_fuel <= 0.0:
+		b_dead_time += dt
 	var h := r - R
 	var m := mass()
 	thrust_now = 0.0
@@ -172,6 +210,13 @@ func step(dt: float) -> void:
 		thrust_now = max_thrust * throttle * (isp / isp_sl) * thrust_scale
 		mdot = max_thrust * throttle / (isp_sl * G0)
 		fuel = maxf(0.0, fuel - mdot * dt)
+	b_thrust_now = 0.0
+	if has_boosters and engine_on and b_fuel > 0.0 and throttle > 0.0:
+		var pb := exp(-h / SCALE_H)
+		var isp_b := lerpf(b_isp_vac, b_isp_sl, pb)
+		b_thrust_now = b_thrust * throttle * (isp_b / b_isp_sl) * thrust_scale
+		b_fuel = maxf(0.0, b_fuel - b_thrust * throttle / (b_isp_sl * G0) * dt)
+		thrust_now += b_thrust_now
 	var g := MU / (r * r)
 	var v := sqrt(vr * vr + vt * vt)
 	q = 0.5 * air_density() * v * v

@@ -25,6 +25,7 @@ var review: DesignReview
 var _hud_root: Control
 var _big: Label
 var _launching := false
+var launch: Dictionary = {}     # hand-off from the launch segment (empty when played stand-alone)
 var _sm := Vector3.ZERO
 var _lt := 0.0
 var _last_cd := -1
@@ -33,7 +34,7 @@ const LAUNCH_ASCENT := 5.0
 
 
 func _init() -> void:
-	mission_id = "m3_docking"
+	mission_id = "m3_iss"
 
 
 func _briefing_data() -> Dictionary:
@@ -147,6 +148,16 @@ func _on_mission_start() -> void:
 		cam_hint.set_inspect(inspecting)
 		if inspecting:
 			Sfx.stop_all_loops())
+	if str(GameState.session.get("profile", "")) == "m3":
+		# the launch segment already designed the cargo + rocket: the damage / fuel it left shapes the docking
+		launch = GameState.session["launch"]
+		var d: Dictionary = GameState.session["design"]
+		design = d
+		st = IssDesign.stats(d)
+		var q := clampf(float(launch["hull"]) / 100.0, 0.0, 1.0)
+		st["fragile"] = float(st["fragile"]) * lerpf(1.5, 1.0, q)      # a battered cargo is more fragile
+		_begin_docking()
+		return
 	_open_design(IssDesign.default_design())
 
 
@@ -217,6 +228,13 @@ func dev_quick_start(d: Dictionary = {}) -> void:
 		design_view.queue_free()
 		design_view = null
 	_begin_docking()
+
+
+func _launch_rating() -> float:
+	var l := launch
+	var r := float(l["hull"]) / 100.0 * 0.6 + float(l["orbit_q"]) * 0.25 + (0.15 if not bool(l["fairing_early"]) else 0.0)
+	r *= 1.0 - clampf(float(l["waste"]) * 0.3 + float(l["booster_waste"]) * 0.2, 0.0, 0.3)
+	return clampf(r, 0.0, 1.0)
 
 
 func _fuel_r() -> float:
@@ -420,7 +438,11 @@ func _end(success: bool, reason: String, stars: int = 0, tip: Vector2 = Vector2.
 		stats.append(["R_SCORE", str(score)])
 		var fuel_r := _fuel_r()
 		var sci := clampf(via * float(st.get("sci", 1.0)), 0.0, 1.3)
-		stats.append(["R_BUDGET_USED", "%s / %s" % [Units.money(int(st.get("cost", 0))), Units.money(IssDesign.BUDGET)]])
+		if launch.is_empty():
+			stats.append(["R_BUDGET_USED", "%s / %s" % [Units.money(int(st.get("cost", 0))), Units.money(IssDesign.BUDGET)]])
+		else:
+			stats.append(["R_BUDGET_USED", "%s / %s" % [Units.money(int(launch["cost"])), Units.money(int(launch["budget"]))]])
+			stats.append(["R_LAUNCH_HULL", "%d%%" % int(launch["hull"])])
 		var launch_r := clampf(1.0 - maxf(float(st.get("mass", 0.0)) / maxf(float(st.get("cap", 1.0)), 1.0) - 0.75, 0.0) * 1.6, 0.4, 1.0)
 		var tips: Array = []
 		if world.contact_speed > 0.15:
@@ -436,7 +458,7 @@ func _end(success: bool, reason: String, stars: int = 0, tip: Vector2 = Vector2.
 		if tips.is_empty():
 			tips.append("M3_TIP_GOOD")
 		extra = {
-			"segments": [["SEG_LAUNCH", launch_r], ["SEG_SPACE", clampf(0.4 + fuel_r, 0.0, 1.0)],
+			"segments": [["SEG_LAUNCH", launch_r if launch.is_empty() else _launch_rating()], ["SEG_SPACE", clampf(0.4 + fuel_r, 0.0, 1.0)],
 				["SEG_GROUND", clampf(1.0 - absf(tip.y) / DockingWorld.TOL_LAT * 0.5, 0.0, 1.0)],
 				["SEG_USER", via]],
 			"science": sci, "science_note": "M3_SCI_NOTE", "tips": tips,

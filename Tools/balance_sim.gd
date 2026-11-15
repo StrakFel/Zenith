@@ -15,10 +15,10 @@ var _flights := 0
 
 func _initialize() -> void:
 	var rockets: Array = []
-	for n in M1Parts.NOSES:
-		for t in M1Parts.TANKS:
-			for e in M1Parts.ENGINES:
-				for u in ["", "u_s", "u_m"]:
+	for n in M1Parts.unlocked_ids("nose"):
+		for t in M1Parts.unlocked_ids("tank"):
+			for e in M1Parts.unlocked_ids("engine"):
+				for u in [""] + M1Parts.unlocked_ids("upper"):
 					rockets.append({"nose": n, "tank": t, "engine": e, "upper": u})
 	var sats: Array = []
 	for g in M1Design.GOALS:

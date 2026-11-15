@@ -1,4 +1,4 @@
-﻿class_name Strings
+class_name Strings
 extends RefCounted
 ## All translatable texts: KEY -> [English, Українська].
 ## Keys are used directly as Label/Button text (Godot translates them
@@ -14,6 +14,7 @@ static func all() -> Dictionary:
 	d.merge(StringsSci.DATA, true)
 	d.merge(StringsCam.DATA, true)
 	d.merge(StringsLunar.DATA, true)
+	d.merge(StringsCampaign.DATA, true)
 	return d
 
 

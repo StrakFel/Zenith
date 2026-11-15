@@ -1,4 +1,4 @@
-﻿class_name MissionRegistry
+class_name MissionRegistry
 extends RefCounted
 ## Single list of all missions. To add mission 4/5: set "available": true and
 ## point "scene" at the new mission scene (which extends MissionBase).
@@ -6,14 +6,14 @@ extends RefCounted
 const MISSIONS: Array[Dictionary] = [
 	{"id": "m1_launch", "title": "M1_TITLE", "desc": "M1_DESC",
 		"scene": "res://Missions/Mission1/mission1.tscn", "available": true, "difficulty": 2, "skill": "MS_M1_SKILL"},
-	{"id": "m2_lunar", "title": "M2_TITLE", "desc": "M2_DESC",
-		"scene": "res://Missions/Mission2/mission2.tscn", "available": true, "difficulty": 3, "skill": "MS_M2_SKILL"},
-	{"id": "m3_docking", "title": "M3_TITLE", "desc": "M3_DESC",
-		"scene": "res://Missions/Mission3/mission3.tscn", "available": true, "difficulty": 4, "skill": "MS_M3_SKILL"},
-	{"id": "m4_lunar", "title": "M4_TITLE", "desc": "M4_DESC",
-		"scene": "", "available": false, "difficulty": 4, "skill": "MS_M4_SKILL"},
-	{"id": "m5_deep", "title": "M5_TITLE", "desc": "M5_DESC",
-		"scene": "", "available": false, "difficulty": 5, "skill": "MS_M5_SKILL"},
+	{"id": "m2_space_ops", "title": "M2_TITLE", "desc": "M2_DESC",
+		"scene": "res://Missions/Mission2/space_ops.tscn", "available": true, "difficulty": 3, "skill": "MS_M2_SKILL"},
+	{"id": "m3_iss", "title": "M3_TITLE", "desc": "M3_DESC",
+		"scene": "res://Missions/Mission3/iss_launch.tscn", "available": true, "difficulty": 4, "skill": "MS_M3_SKILL"},
+	{"id": "m4_constellation", "title": "M4_TITLE", "desc": "M4_DESC",
+		"scene": "res://Missions/Mission4/constellation_launch.tscn", "available": true, "difficulty": 4, "skill": "MS_M4_SKILL"},
+	{"id": "m5_moon", "title": "M5_TITLE", "desc": "M5_DESC",
+		"scene": "res://Missions/Mission5/moon_launch.tscn", "available": true, "difficulty": 5, "skill": "MS_M5_SKILL"},
 ]
 
 

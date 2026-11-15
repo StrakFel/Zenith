@@ -1,4 +1,4 @@
-﻿class_name SpacewalkWorld
+class_name SpacewalkWorld
 extends Control
 ## Mission 2 world: astronaut with inertia (no drag in vacuum), limited thruster gas,
 ## a station airlock, and a damaged satellite with three repair points.
@@ -28,6 +28,9 @@ var vel := Vector2.ZERO
 var fuel := FUEL_MAX
 var o2 := O2_MAX
 var suit := 100.0
+var fuel_cap := FUEL_MAX
+var o2_cap := O2_MAX
+var suit_k := 1.0                 # suit durability multiplier (armoured suit > 1)
 var progress: Array[float] = [0.0, 0.0, 0.0]
 var done: Array[bool] = [false, false, false]
 var thrusting := false
@@ -163,7 +166,7 @@ func _collide() -> void:
 		if impact > 0.0:
 			vel += n * impact * 1.35
 			if impact > 1.2:
-				suit = maxf(0.0, suit - (impact - 1.2) * 14.0 - 4.0)
+				suit = maxf(0.0, suit - ((impact - 1.2) * 14.0 + 4.0) / suit_k)
 				collisions += 1
 				suit_hit.emit()
 				_fx.append({"p": pos, "t": 0.0, "kind": "hit"})

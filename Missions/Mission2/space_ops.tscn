@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://Missions/Mission2/space_ops.gd" id="1"]
+
+[node name="SpaceOperations" type="Node"]
+script = ExtResource("1")

@@ -5,7 +5,7 @@ extends Control
 
 signal launch_requested(build: Dictionary)
 
-const SLOT_KEYS := {"nose": "M1_SLOT_NOSE", "upper": "M1_SLOT_UPPER", "tank": "M1_SLOT_TANK", "engine": "M1_SLOT_ENGINE"}
+const SLOT_KEYS := {"nose": "M1_SLOT_NOSE", "upper": "M1_SLOT_UPPER", "tank": "M1_SLOT_TANK", "engine": "M1_SLOT_ENGINE", "booster": "M1_SLOT_BOOSTER"}
 
 
 # ------------------------------------------------------------------ icon ----
@@ -33,7 +33,7 @@ class PartIcon extends Control:
 				RocketDrawer.draw_nose(self, id, r, 1.0)
 			"tank":
 				RocketDrawer.draw_tank(self, id, r, 1.0)
-			"upper":
+			"upper", "booster":
 				RocketDrawer.draw_tank(self, "s", r, 1.0)
 			_:
 				RocketDrawer.draw_engine(self, id, r, 1.0)
@@ -153,8 +153,10 @@ class PadCanvas extends Control:
 		var off := -get_global_rect().position
 		var pulse := 0.5 + 0.5 * sin(_t * 4.0)
 		for slot in M1Parts.SLOTS:
-			if slot == "upper" and str(build.get("upper", "")) == "":
+			if (slot == "upper" or slot == "booster") and str(build.get(slot, "")) == "":
 				continue   # optional stage: no bracket while it is not installed
+			if slot == "booster":
+				continue
 			var span := rk.slot_world_span(slot)
 			if cam.is_position_behind(span[0]) or cam.is_position_behind(span[1]):
 				continue
@@ -180,7 +182,7 @@ class PadCanvas extends Control:
 				draw_rect(hr, UIKit.C_ORANGE, false, 3.0)
 
 # ------------------------------------------------------------------ view ----
-var build: Dictionary = {"nose": "", "upper": "", "tank": "", "engine": ""}
+var build: Dictionary = {"nose": "", "upper": "", "tank": "", "engine": "", "booster": ""}
 var scene3d: PadScene3D
 var payload_mass := M1Parts.PAYLOAD_MASS
 var sat_cost := 0
@@ -238,7 +240,7 @@ func _build_left() -> Control:
 	v.add_child(UIKit.label("M1_ASM_TITLE", 26, Color.WHITE))
 	v.add_child(UIKit.label("M1_ASM_HINT", 13, UIKit.C_MUTED))
 	v.add_child(HSeparator.new())
-	for slot in M1Parts.SLOTS:
+	for slot in _slots():
 		var row := UIKit.hbox(6)
 		var name_col := UIKit.vbox(0)
 		name_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -269,7 +271,7 @@ func _build_left() -> Control:
 		_stat_labels[r[1]] = val2
 	var cost_row := UIKit.hbox(8)
 	cost_row.add_child(UIKit.label("M1_ST_COST", 15, UIKit.C_MUTED))
-	_stat_labels["cost"] = UIKit.label("%s / %s" % [Units.money(0), Units.money(M1Parts.BUDGET)], 16, UIKit.C_WARN, HORIZONTAL_ALIGNMENT_RIGHT)
+	_stat_labels["cost"] = UIKit.label("%s / %s" % [Units.money(0), Units.money(M1Parts.active_budget)], 16, UIKit.C_WARN, HORIZONTAL_ALIGNMENT_RIGHT)
 	_stat_labels["cost"].size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	cost_row.add_child(_stat_labels["cost"])
 	v.add_child(cost_row)
@@ -296,7 +298,7 @@ func _build_right() -> Control:
 	var tabs := UIKit.hbox(6)
 	v.add_child(tabs)
 	var group := ButtonGroup.new()
-	for slot in ["engine", "tank", "upper", "nose"]:
+	for slot in _tab_slots():
 		var b := Button.new()
 		b.text = SLOT_KEYS[slot]
 		b.toggle_mode = true
@@ -317,6 +319,23 @@ func _build_right() -> Control:
 	return p
 
 
+## Slots that exist in the mission being designed (strap-on boosters appear from Mission 4).
+func _slots() -> Array:
+	var out: Array = []
+	for sl in M1Parts.SLOTS:
+		if sl == "booster" and M1Parts.unlocked_ids("booster").is_empty():
+			continue
+		out.append(sl)
+	return out
+
+
+func _tab_slots() -> Array:
+	var out: Array = ["engine", "tank", "upper", "nose"]
+	if not M1Parts.unlocked_ids("booster").is_empty():
+		out.insert(3, "booster")
+	return out
+
+
 func _show_tab(slot: String) -> void:
 	_tab_slot = slot
 	(_tab_buttons[slot] as Button).button_pressed = true
@@ -324,6 +343,8 @@ func _show_tab(slot: String) -> void:
 		c.queue_free()
 	var cat := M1Parts.catalog(slot)
 	for id in cat:
+		if not M1Parts.is_unlocked(slot, id):
+			continue
 		var card := PartCard.new()
 		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_cards_box.add_child(card)
@@ -343,11 +364,11 @@ func _on_install(slot: String, id: String) -> void:
 func _refresh() -> void:
 	_canvas.build = build
 	var st := M1Parts.compute(build, payload_mass, sat_cost)
-	for slot in M1Parts.SLOTS:
+	for slot in _slots():
 		var id := str(build[slot])
 		var row: Dictionary = _slot_rows[slot]
 		var lab: Label = row["label"]
-		lab.text = str(M1Parts.catalog(slot)[id]["name"]) if id != "" else ("M1_NO_UPPER" if slot == "upper" else "M1_EMPTY")
+		lab.text = str(M1Parts.catalog(slot)[id]["name"]) if id != "" else ("M1_NO_UPPER" if slot == "upper" else ("M1_NO_BOOSTER" if slot == "booster" else "M1_EMPTY"))
 		lab.add_theme_color_override("font_color", UIKit.C_TEXT if id != "" else UIKit.C_MUTED)
 		(row["remove"] as Button).disabled = id == ""
 	(_stat_labels["stages"] as Label).text = "%d" % int(st["stages"])
@@ -362,10 +383,10 @@ func _refresh() -> void:
 	var dv := float(st["dv"])
 	var dv_l: Label = _stat_labels["dv"]
 	dv_l.text = Units.ms(dv) if bool(st["complete"]) else "-"
-	dv_l.add_theme_color_override("font_color", UIKit.C_GOOD if dv >= M1Parts.REQUIRED_DV else UIKit.C_BAD)
-	(_stat_labels["cost"] as Label).text = "%s / %s" % [Units.money(int(st["cost"])), Units.money(M1Parts.BUDGET)]
+	dv_l.add_theme_color_override("font_color", UIKit.C_GOOD if dv >= M1Parts.active_required_dv else UIKit.C_BAD)
+	(_stat_labels["cost"] as Label).text = "%s / %s" % [Units.money(int(st["cost"])), Units.money(M1Parts.active_budget)]
 	(_stat_labels["cost"] as Label).add_theme_color_override("font_color", UIKit.C_BAD if bool(st["over_budget"]) else UIKit.C_WARN)
-	_cost_bar.value = float(st["cost"]) / float(M1Parts.BUDGET) * 100.0
+	_cost_bar.value = float(st["cost"]) / float(M1Parts.active_budget) * 100.0
 	UIKit.set_bar_color(_cost_bar, UIKit.C_BAD if bool(st["over_budget"]) else UIKit.C_WARN)
 	var msgs := M1Parts.readiness(st)
 	var worst: String = msgs[0]

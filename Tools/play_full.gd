@@ -267,66 +267,87 @@ func _run() -> void:
 	_release_all()
 	_check(_gs.is_completed("m1_launch"), "M1: progress saved (stars %d)" % _gs.get_stars("m1_launch"))
 	_check(await _click_text("BTN_NEXT"), "M1 results: CLICK Next mission")
-	m = await _wait_scene("mission2")
-	_check(current_scene.scene_file_path.contains("mission2"), "Next mission opens Mission 2")
+	m = await _wait_scene("space_ops")
+	_check(current_scene.scene_file_path.contains("space_ops"), "Next mission opens Mission 2 (Space Operations, launch segment)")
 
-	# ============================================================ MISSION 2 (Lunar Expedition)
-	_check(await _click_text("BTN_START"), "M2: CLICK Start mission")
-	await _frames(40)
-	_check(m.state == m.S.DESIGN and m.design_view != null, "M2: mission design lab is open")
-	_check(await _click_text("LUN_CONTINUE"), "M2: CLICK Continue to verification")
-	await _frames(40)
-	_check(m.state == m.S.REVIEW, "M2: verification (design review) window is open")
-	_check(await _click_text("REV_LAUNCH"), "M2: CLICK Approve and launch")
-	await _frames(40)
-	_check(m.state == m.S.LAUNCH, "M2: launch sequence started")
-	_check(await _wait_state(m, m.S.TRANSFER, 1500), "M2: launch finished, transfer planning open")
-	m._tli_slider.value = LunarDesign.ideal_tli_dv()
-	await _frames(5)
-	_check(m.tli_dv > 3100.0 and LunarDesign.tli_outcome(m.tli_dv) == 0, "M2: planner shows a clean-intercept burn")
-	_check(await _click_text("LUN_TLI_EXEC"), "M2: CLICK Execute burn")
-	_check(await _wait_state(m, m.S.DESCENT, 1500), "M2: Moon intercepted, descent started")
+	# ============================================================ MISSION 2: Space Operations
+	m = await _campaign_launch(m, "M2", [["M1_SLOT_ENGINE", 1], ["M1_SLOT_TANK", 1], ["M1_SLOT_NOSE", 0]], "spacewalk")
+	_check(current_scene.scene_file_path.contains("spacewalk") and m.mission_id == "m2_space_ops", "M2: launch hand-off opens the spacewalk (mission id %s)" % m.mission_id)
+	_check(m.world.o2_cap > 0.0 and m.ops_launch.has("hull"), "M2: spacewalk reads the launch result (O2 cap %d, hull %d%%)" % [int(m.world.o2_cap), int(m.ops_launch["hull"])])
+	_check(await _click_text("BTN_START"), "M2: CLICK Start (operations phase)")
 	await _frames(60)
-	await _check_inspect_lunar(m)
-	await _test_pause_lunar(m)
-	var ok2 := await _fly_lunar_descent(m)
-	_check(ok2 and m.lm.landed, "M2: lander touched down safely (keyboard pilot, %s)" % m.lm.outcome)
-	await _frames(30)
-	_check(m.state == m.S.SURFACE, "M2: surface operations started")
-	var ok2b := await _drive_rover(m)
-	_check(ok2b and m.r_samples == 3, "M2: rover collected %d / 3 samples (keyboard, E key)" % m.r_samples)
-	_release_all()
-	await _key(KEY_ENTER)
-	_check(await _wait_result(m, 1500), "M2: data uplinked, results window shown")
-	_check(_gs.is_completed("m2_lunar"), "M2: progress saved")
+	await _check_inspect_vehicle(m, "M2")
+	await _test_pause(m, "M2")
+	m.dev_autopilot = true
+	_check(await _wait_result(m, 60000), "M2: spacewalk finished, results window shown (test autopilot)")
+	_check(_gs.is_completed("m2_space_ops"), "M2: progress saved")
 	_check(await _click_text("BTN_NEXT"), "M2 results: CLICK Next mission")
-	m = await _wait_scene("mission3")
-	_check(current_scene.scene_file_path.contains("mission3"), "Next mission opens Mission 3")
+	m = await _wait_scene("iss_launch")
 
-	# ============================================================ MISSION 3
-	_check(await _click_text("BTN_START"), "M3: CLICK Start mission")
-	await _frames(40)
-	_check(m.design_view != null, "M3: cargo design lab is open")
-	_check(await _click_text("LUN_CONTINUE"), "M3: CLICK Continue to verification")
-	await _frames(40)
-	_check(await _click_text("REV_LAUNCH"), "M3: CLICK Approve and launch")
-	await _frames(1000)
-	_check(m.started, "M3: launch done, docking phase running")
+	# ============================================================ MISSION 3: ISS Expedition
+	m = await _campaign_launch(m, "M3", [["M1_SLOT_ENGINE", 1], ["M1_SLOT_TANK", 1], ["M1_SLOT_NOSE", 0]], "mission3")
+	_check(await _click_text("BTN_START"), "M3: CLICK Start (docking phase)")
+	await _frames(60)
+	_check(m.started and not m.launch.is_empty(), "M3: launch hand-off reached the docking scene (fuel x%.2f)" % float(m.st["fuel"]))
 	await _fly_m3_some(m, 900)
 	await _check_inspect_vehicle(m, "M3")
 	var ok3 := await _fly_m3(m)
 	_check(ok3, "M3: docked with the station (keyboard pilot)")
 	_release_all()
-	_check(_gs.is_completed("m3_docking"), "M3: progress saved")
-	_check(await _click_text("BTN_MISSIONS"), "M3 results: CLICK Mission select")
-	m = await _wait_scene("mission_select")
-	_check(current_scene.scene_file_path.contains("mission_select"), "Mission select reopened after M3")
+	_check(_gs.is_completed("m3_iss"), "M3: progress saved")
+	_check(await _click_text("BTN_NEXT"), "M3 results: CLICK Next mission")
+	m = await _wait_scene("constellation_launch")
+
+	# ============================================================ MISSION 4: Satellite Constellation
+	m = await _campaign_launch(m, "M4", [["M1_SLOT_ENGINE", 1], ["M1_SLOT_TANK", 1], ["M1_SLOT_UPPER", 0], ["M1_SLOT_BOOSTER", 0], ["M1_SLOT_NOSE", 0]], "mission4_ops")
+	_check(m.mission_id == "m4_constellation", "M4: launch hand-off opens the deployment phase")
+	_check(await _click_text("BTN_START"), "M4: CLICK Start (deployment phase)")
+	await _frames(60)
+	m.dev_autopilot = true
+	_check(await _wait_result(m, 60000), "M4: constellation deployed, results window shown (test autopilot)")
+	_check(_gs.is_completed("m4_constellation"), "M4: progress saved (stars %d)" % _gs.get_stars("m4_constellation"))
+	_check(await _click_text("BTN_NEXT"), "M4 results: CLICK Next mission")
+	m = await _wait_scene("moon_launch")
+
+	# ============================================================ MISSION 5: Moon & Return
+	m = await _campaign_launch(m, "M5", [["M1_SLOT_ENGINE", 3], ["M1_SLOT_TANK", 3], ["M1_SLOT_UPPER", 3], ["M1_SLOT_NOSE", 0]], "mission5_ops", {"ascent": "m", "capsule": "heavy"})
+	_check(m.mission_id == "m5_moon", "M5: launch hand-off opens the lunar expedition")
+	_check(await _click_text("BTN_START"), "M5: CLICK Start (lunar expedition)")
+	await _frames(60)
+	m.dev_autopilot = true
+	var ret_wait := 0
+	for i in 160000:
+		await process_frame
+		if _has_result(m):
+			break
+		if "_ret_panel" in m and m._ret_panel != null and is_instance_valid(m._ret_panel):
+			ret_wait += 1
+			if ret_wait > 40:
+				ret_wait = 0
+				match m._ret_step:
+					0:
+						if not m._ret_btn.disabled:
+							await _click_text("MOON_ASC_BTN")
+					1:
+						m._ret_slider.value = 1000.0
+						await _click_text("MOON_EXEC")
+					2:
+						m._ret_slider.value = -6.0
+						await _click_text("MOON_ENT_BTN")
+	_check(_has_result(m) or await _wait_result(m, 600), "M5: expedition finished (landing, return legs), results window shown")
+	print("DEBUG M5 ret=", m.ret, " dv_left=", m.launch.get("dv_left"), " samples=", m.r_samples, " design=", m.design)
+	_check(m.last_success, "M5: mission success (stars %d)" % m.last_stars)
+	_check(_gs.is_completed("m5_moon"), "M5: progress saved")
+	_check(await _click_text("BTN_MISSIONS"), "M5 results: CLICK Mission select")
+	Engine.time_scale = 1.0
+	m = await _wait_scene("mission_select", 6000)
+	_check(current_scene.scene_file_path.contains("mission_select"), "Mission select reopened after M5")
 
 	# ============================================================ SAVE FILE
 	var cfg := ConfigFile.new()
 	var err := cfg.load("user://zenith_test_save.cfg")
 	var saved: Dictionary = JSON.parse_string(str(cfg.get_value("progress", "data", "{}")))
-	_check(err == OK and saved.has("m1_launch") and saved.has("m2_lunar") and saved.has("m3_docking"), "save file on disk contains all 3 missions")
+	_check(err == OK and saved.has("m1_launch") and saved.has("m2_space_ops") and saved.has("m3_iss") and saved.has("m4_constellation") and saved.has("m5_moon"), "save file on disk contains all 5 missions")
 
 	# ============================================================ LOSS / RETRY / PLAY
 	await _test_loss_retry()
@@ -345,6 +366,41 @@ func _collect_buttons(node: Node, text: String, out: Array) -> void:
 	for c in node.get_children():
 		_collect_buttons(c, text, out)
 
+
+
+## Real clicks through payload lab -> rocket designer -> validation -> launch. The ascent itself is flown by the test
+## autopilot (the keyboard pilot of Mission 1 is tuned for its own rocket). Returns the operations scene.
+func _campaign_launch(m: Node, tag: String, installs: Array, ops_part: String, design_over: Dictionary = {}) -> Node:
+	_check(await _click_text("BTN_START"), "%s: CLICK Start mission" % tag)
+	await _frames(40)
+	_check(m.payload_lab != null, "%s: payload lab is open" % tag)
+	for k in design_over:
+		m.payload_lab.design[k] = design_over[k]       # (option cards are not clicked one by one here)
+	_check(await _click_text("PL_CONTINUE"), "%s: CLICK To the rocket designer" % tag)
+	await _frames(40)
+	_check(m.state == m.S.ASSEMBLY and m.assembly != null, "%s: rocket designer opened (mission-specific budget %d)" % [tag, M1Parts.active_budget])
+	for step in installs:
+		await _click_text(step[0])
+		await _frames(6)
+		var inst: Array = []
+		_collect_buttons(root, "M1_INSTALL", inst)
+		if int(step[1]) >= inst.size():
+			_check(false, "%s: part card %d missing in tab %s (%d cards)" % [tag, int(step[1]), step[0], inst.size()])
+			continue
+		await _click(inst[int(step[1])])
+		await _frames(6)
+	await _click_text("M1_TO_REVIEW")
+	await _frames(40)
+	_check(m.state == m.S.REVIEW, "%s: Mission Validation window is open" % tag)
+	_check(await _click_text("REV_LAUNCH"), "%s: CLICK Approve and launch" % tag)
+	await _frames(40)
+	_check(m.state == m.S.COUNTDOWN, "%s: countdown started" % tag)
+	m.dev_autopilot = true
+	Engine.time_scale = 8.0
+	var ops := await _wait_scene(ops_part, 60000)
+	Engine.time_scale = 1.0
+	await _frames(30)
+	return ops
 
 # ---------------------------------------------------------------- camera / pause --
 func _check_inspect_m1(m: Node) -> void:
@@ -594,19 +650,20 @@ func _fly_m3(m: Node) -> bool:
 
 # -------------------------------------------------------------- loss + restart -----
 func _test_loss_retry() -> void:
-	# --- Mission 2 loss: wrong trans-lunar burn (miss the Moon), then Retry
-	_router.go_to("res://Missions/Mission2/mission2.tscn")
-	var m := await _wait_scene("mission2")
+	# --- Mission 2 launch failure (out of fuel before orbit), then Retry
+	_router.go_to("res://Missions/Mission2/space_ops.tscn")
+	var m := await _wait_scene("space_ops")
 	await _click_text("BTN_START")
 	await _frames(40)
-	m.dev_auto_design()
-	m._on_launch()
-	await _wait_state(m, m.S.TRANSFER, 1500)
-	m._tli_slider.value = 3010.0
-	await _frames(5)
-	await _click_text("LUN_TLI_EXEC")
-	var got := await _wait_result(m, 1500)
-	_check(got, "M2 loss: a wrong trans-lunar burn (miss) shows the result window")
+	m._on_design_done(LaunchProfiles.default_design("m2"))
+	m.state = m.S.REVIEW
+	m._on_launch({"nose": "std", "tank": "m", "engine": "kestrel", "upper": "", "booster": ""})
+	await _frames(60)
+	m.model.fuel = 0.0
+	m.state = m.S.FLIGHT
+	m.model.engine_on = true
+	var got := await _wait_result(m, 3000)
+	_check(got, "M2 loss: out of fuel before orbit shows the result window")
 	var title_fail := false
 	for c in m.overlay.get_children():
 		if c.has_method("show_result"):
@@ -614,7 +671,7 @@ func _test_loss_retry() -> void:
 	_check(title_fail, "M2 loss: result window offers Retry")
 	var before := m.get_instance_id()
 	await _click_text("BTN_RETRY")
-	m = await _wait_scene("mission2")
+	m = await _wait_scene("space_ops")
 	_check(m.get_instance_id() != before and not m.ended, "M2: CLICK Retry reloads a fresh mission")
 	# --- pause menu: restart + main menu
 	await _click_text("BTN_START")
@@ -623,7 +680,7 @@ func _test_loss_retry() -> void:
 	await _frames(5)
 	before = m.get_instance_id()
 	await _click_text("BTN_RESTART")
-	m = await _wait_scene("mission2")
+	m = await _wait_scene("space_ops")
 	_check(m.get_instance_id() != before, "M2: pause menu -> Restart reloads the mission")
 	await _click_text("BTN_START")
 	await _frames(40)
@@ -647,7 +704,7 @@ func _test_loss_retry() -> void:
 		_gs.settings["locale"] = loc
 		_gs.apply_settings()
 		for scene in ["res://Menus/TempMenu/temp_main_menu.tscn", "res://Menus/TempMenu/mission_select.tscn", "res://Menus/TempMenu/settings.tscn",
-				"res://Missions/Mission1/mission1.tscn", "res://Missions/Mission2/mission2.tscn", "res://Missions/Mission3/mission3.tscn"]:
+				"res://Missions/Mission1/mission1.tscn", "res://Missions/Mission2/space_ops.tscn", "res://Missions/Mission3/iss_launch.tscn", "res://Missions/Mission4/constellation_launch.tscn", "res://Missions/Mission5/moon_launch.tscn"]:
 			_router.go_to(scene)
 			await _wait_scene(scene.get_file().get_basename())
 			var bad: Array[String] = []

@@ -89,27 +89,32 @@ func _run() -> void:
 	_check(m != null and m.scene_file_path.contains("mission1"), "Play with no progress starts Mission 1")
 	gs.record_result("m1_launch", 2, 1000)
 	router.play()
-	m = await _wait_scene("mission2")
-	_check(m.scene_file_path.contains("mission2"), "Play after Mission 1 starts Mission 2")
-	gs.record_result("m2_lunar", 2, 1000)
+	m = await _wait_scene("space_ops")
+	_check(m.scene_file_path.contains("space_ops"), "Play after Mission 1 starts Mission 2")
+	gs.record_result("m2_space_ops", 2, 1000)
 	router.play()
-	m = await _wait_scene("mission3")
-	_check(m.scene_file_path.contains("mission3"), "Play after Mission 2 starts Mission 3")
-	gs.record_result("m3_docking", 3, 1000)
+	m = await _wait_scene("iss_launch")
+	_check(m.scene_file_path.contains("iss_launch"), "Play after Mission 2 starts Mission 3")
+	gs.record_result("m3_iss", 3, 1000)
+	gs.record_result("m4_constellation", 2, 1000)
 	router.play()
-	m = await _wait_scene("mission3")
-	_check(m.scene_file_path.contains("mission3"), "Play with everything done replays the last mission (never the list)")
+	m = await _wait_scene("moon_launch")
+	_check(m.scene_file_path.contains("moon_launch"), "Play after Mission 4 starts Mission 5")
+	gs.record_result("m5_moon", 3, 1000)
+	router.play()
+	m = await _wait_scene("moon_launch")
+	_check(m.scene_file_path.contains("moon_launch"), "Play with everything done replays the last mission (never the list)")
 
 	# ---------------------------------------------------------------- unlock rules
 	gs.progress.clear()
 	var reg = load("res://Core/mission_registry.gd")   # loaded lazily: it uses autoloads
-	_check(reg.is_unlocked("m1_launch") and not reg.is_unlocked("m2_lunar") and not reg.is_unlocked("m3_docking"),
+	_check(reg.is_unlocked("m1_launch") and not reg.is_unlocked("m2_space_ops") and not reg.is_unlocked("m3_iss"),
 		"missions unlock sequentially (only M1 at the start)")
-	_check(not reg.is_unlocked("m4_lunar") and not reg.is_unlocked("m5_deep"), "missions 4-5 are locked (coming soon)")
+	_check(not reg.is_unlocked("m4_constellation") and not reg.is_unlocked("m5_moon"), "missions 4-5 are locked until the previous mission is done")
 	gs.record_result("m1_launch", 1, 500)
-	_check(reg.is_unlocked("m2_lunar") and not reg.is_unlocked("m3_docking"), "completing M1 unlocks M2 only")
-	gs.record_result("m2_lunar", 1, 500)
-	_check(reg.is_unlocked("m3_docking") and reg.is_unlocked("m1_launch"), "M3 unlocked, completed missions stay replayable")
+	_check(reg.is_unlocked("m2_space_ops") and not reg.is_unlocked("m3_iss"), "completing M1 unlocks M2 only")
+	gs.record_result("m2_space_ops", 1, 500)
+	_check(reg.is_unlocked("m3_iss") and reg.is_unlocked("m1_launch"), "M3 unlocked, completed missions stay replayable")
 
 	# ---------------------------------------------------------------- mission select screen
 	router.go_to(router.MISSION_SELECT)
@@ -208,8 +213,8 @@ func _run() -> void:
 	_check(absf(r_before - m.model.r) > 0.05, "simulation resumes after inspect mode")
 
 	# ---------------------------------------------------------------- mission 2 / 3 inspect mode
-	for entry in [["mission3", "m3_docking"]]:
-		router.start_mission(entry[1])
+	for entry in [["mission3", "m3_iss"]]:
+		router.go_to("res://Missions/Mission3/mission3.tscn")
 		m = await _wait_scene(entry[0])
 		m.dev_skip_briefing()
 		m.dev_quick_start()

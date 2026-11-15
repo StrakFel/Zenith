@@ -19,7 +19,7 @@ func _initialize() -> void:
 				_design[p[0]] = p[1]
 	Engine.time_scale = float(a[1]) if a.size() > 1 else 6.0
 	root.get_node("GameState").progress.clear()
-	change_scene_to_file("res://Missions/Mission2/mission2.tscn")
+	change_scene_to_file("res://Missions/Mission5/moon_mission.tscn")
 
 
 func _process(_d: float) -> bool:

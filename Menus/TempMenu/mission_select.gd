@@ -5,7 +5,7 @@ extends Node3D
 ## around freely with the orbit camera (LMB rotate, wheel zoom, RMB pan, R reset, double-click focus).
 
 const SPACING := 140.0
-const VIEW_DIST := [118.0, 66.0, 96.0, 100.0, 108.0]
+const VIEW_DIST := [118.0, 66.0, 96.0, 76.0, 66.0]
 
 var stage: SpaceStage
 var camera: Camera3D
@@ -122,30 +122,23 @@ func _build_groups() -> void:
 	rk.set_thrust(0.55, 0.0, Vector3.ZERO)
 	orbit.add_focusable(rk, 30.0, 95.0)
 	orbit.add_obstacle(rk, 5.0, 28.0)
-	# --- 2: the Moon with lander and rover (lunar expedition)
-	var mo := MeshInstance3D.new()
-	var mos := SphereMesh.new()
-	mos.radius = 15.0
-	mos.height = 30.0
-	mos.radial_segments = 64
-	mos.rings = 32
-	mo.mesh = mos
-	var mmat := ShaderMaterial.new()
-	mmat.shader = load("res://Core3D/shaders/moon_globe.gdshader")
-	mo.material_override = mmat
-	_groups[1].add_child(mo)
-	var lan := (load("res://Assets/Models/lander.glb") as PackedScene).instantiate() as Node3D
-	lan.scale = Vector3.ONE * 1.4
-	lan.position = Vector3(0, 15.0, 0)
-	_groups[1].add_child(lan)
-	var rov := (load("res://Assets/Models/rover.glb") as PackedScene).instantiate() as Node3D
-	rov.scale = Vector3.ONE * 1.6
-	rov.position = Vector3(7.5, 13.2, 0)
-	rov.rotation = Vector3(0, 0.6, -0.5)
-	_groups[1].add_child(rov)
-	orbit.add_focusable(mo, 16.0, 62.0)
-	orbit.add_focusable(lan, 5.0, 24.0)
-	orbit.add_obstacle(mo, 15.5)
+	# --- 2: damaged satellite + astronaut (space operations)
+	var sat := (load("res://Assets/Models/satellite.glb") as PackedScene).instantiate() as Node3D
+	_groups[1].add_child(sat)
+	var wing := sat.find_child("wing_L", true, false)
+	if wing is Node3D:
+		(wing as Node3D).rotation.z = 0.55
+	var dish := sat.find_child("dish", true, false)
+	if dish is Node3D:
+		(dish as Node3D).rotation.z = -0.75
+	_astro = (load("res://Assets/Models/astronaut.glb") as PackedScene).instantiate() as Node3D
+	_astro.scale = Vector3.ONE * 1.6
+	_astro.position = Vector3(-17, -5, 12)
+	_groups[1].add_child(_astro)
+	orbit.add_focusable(sat, 16.0, 62.0)
+	orbit.add_focusable(_astro, 3.0, 12.0)
+	orbit.add_obstacle(sat, 9.0)
+	orbit.add_obstacle(_astro, 2.0)
 	# --- 3: station + spacecraft
 	var st := (load("res://Assets/Models/station.glb") as PackedScene).instantiate() as Node3D
 	st.scale = Vector3.ONE * 0.5
@@ -161,50 +154,51 @@ func _build_groups() -> void:
 	orbit.add_focusable(ship, 6.0, 26.0)
 	orbit.add_obstacle(center, 24.0)
 	orbit.add_obstacle(ship, 5.0)
-	# --- 4 & 5: classified (hologram) bodies - missions still being designed
-	var moon := MeshInstance3D.new()
-	var sm := SphereMesh.new()
-	sm.radius = 26.0
-	sm.height = 52.0
-	sm.radial_segments = 48
-	sm.rings = 24
-	moon.mesh = sm
-	moon.material_override = _holo_mat()
-	_groups[3].add_child(moon)
-	_holos.append(moon)
-	var giant := MeshInstance3D.new()
-	var gm := SphereMesh.new()
-	gm.radius = 22.0
-	gm.height = 44.0
-	gm.radial_segments = 48
-	gm.rings = 24
-	giant.mesh = gm
-	giant.material_override = _holo_mat()
-	_groups[4].add_child(giant)
-	var ring := MeshInstance3D.new()
-	var tm := TorusMesh.new()
-	tm.inner_radius = 34.0
-	tm.outer_radius = 44.0
-	ring.mesh = tm
-	ring.scale = Vector3(1, 0.04, 1)
-	ring.rotation.x = 0.35
-	ring.material_override = _holo_mat()
-	_groups[4].add_child(ring)
-	_holos.append(giant)
-	for g in [_groups[3], _groups[4]]:
-		var lab := Label3D.new()
-		lab.text = tr("MS_SECRET")
-		lab.font_size = 64
-		lab.pixel_size = 0.07
-		lab.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		lab.modulate = Color(0.5, 0.85, 1.0, 0.9)
-		lab.no_depth_test = true
-		lab.position = Vector3(0, 44, 0)
-		g.add_child(lab)
-	orbit.add_focusable(moon, 26.0, 90.0)
-	orbit.add_focusable(giant, 22.0, 90.0)
-	orbit.add_obstacle(moon, 27.0)
-	orbit.add_obstacle(giant, 23.0)
+	# --- 4: satellite constellation: a small Earth with a ring of satellites
+	var ge := MeshInstance3D.new()
+	var gs := SphereMesh.new()
+	gs.radius = 12.0
+	gs.height = 24.0
+	gs.radial_segments = 64
+	gs.rings = 32
+	ge.mesh = gs
+	var gm := ShaderMaterial.new()
+	gm.shader = load("res://Core3D/shaders/planet.gdshader")
+	ge.material_override = gm
+	_groups[3].add_child(ge)
+	for k in 6:
+		var a2 := TAU * float(k) / 6.0
+		var sp := (load("res://Assets/Models/satellite.glb") as PackedScene).instantiate() as Node3D
+		sp.scale = Vector3.ONE * 0.22
+		sp.position = Vector3(cos(a2), 0.0, sin(a2)) * 22.0
+		sp.rotation.y = -a2
+		_groups[3].add_child(sp)
+	orbit.add_focusable(ge, 14.0, 70.0)
+	orbit.add_obstacle(ge, 12.5)
+	# --- 5: the Moon with lander and rover (lunar expedition)
+	var mo := MeshInstance3D.new()
+	var mos := SphereMesh.new()
+	mos.radius = 15.0
+	mos.height = 30.0
+	mos.radial_segments = 64
+	mos.rings = 32
+	mo.mesh = mos
+	var mmat := ShaderMaterial.new()
+	mmat.shader = load("res://Core3D/shaders/moon_globe.gdshader")
+	mo.material_override = mmat
+	_groups[4].add_child(mo)
+	var lan := (load("res://Assets/Models/lander.glb") as PackedScene).instantiate() as Node3D
+	lan.scale = Vector3.ONE * 1.4
+	lan.position = Vector3(0, 15.0, 0)
+	_groups[4].add_child(lan)
+	var rov := (load("res://Assets/Models/rover.glb") as PackedScene).instantiate() as Node3D
+	rov.scale = Vector3.ONE * 1.6
+	rov.position = Vector3(7.5, 13.2, 0)
+	rov.rotation = Vector3(0, 0.6, -0.5)
+	_groups[4].add_child(rov)
+	orbit.add_focusable(mo, 16.0, 62.0)
+	orbit.add_focusable(lan, 5.0, 24.0)
+	orbit.add_obstacle(mo, 15.5)
 	orbit.add_obstacle(stage.planet_pivot, SpaceStage.R * 1.01)
 
 

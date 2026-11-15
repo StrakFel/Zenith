@@ -19,6 +19,8 @@ var settings: Dictionary = {
 }
 ## mission_id -> {"completed": bool, "stars": int, "score": int}
 var progress: Dictionary = {}
+## Hand-over between the phases of one mission (launch -> operations). Not saved to disk.
+var session: Dictionary = {}
 
 
 func _ready() -> void:

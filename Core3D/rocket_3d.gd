@@ -6,10 +6,12 @@ extends Node3D
 
 const RADIUS := 2.0
 const NOSE_H := {"std": 12.0, "aero": 18.0}
-const TANK_H := {"s": 14.0, "m": 22.0, "l": 32.0}
-const ENGINE_H := {"spark": 5.5, "kestrel": 7.0, "phoenix": 8.5}
-const ENGINE_R := {"spark": 1.25, "kestrel": 1.75, "phoenix": 1.9}
-const UPPER_H := {"u_s": 12.0, "u_m": 17.0}     # interstage (3 m) + upper tank
+const TANK_H := {"s": 14.0, "m": 22.0, "l": 32.0, "xl": 42.0}
+const ENGINE_H := {"spark": 5.5, "kestrel": 7.0, "phoenix": 8.5, "titan": 10.0}
+const ENGINE_R := {"spark": 1.25, "kestrel": 1.75, "phoenix": 1.9, "titan": 2.4}
+const BOOSTER_H := {"b_s": 28.0, "b_l": 34.0}
+const BOOSTER_N := {"b_s": 2, "b_l": 4}
+const UPPER_H := {"u_s": 12.0, "u_m": 17.0, "u_h": 20.0, "u_t": 26.0}     # interstage (3 m) + upper tank
 const DEFAULTS := {"nose": "std", "tank": "m", "engine": "kestrel"}
 
 var build: Dictionary = {}
@@ -32,6 +34,10 @@ var _holo: ShaderMaterial
 var _t := 0.0
 var _thrust := 0.0
 var stage2_active := false
+var booster_level := 0.0              # 0..1: how hard the strap-on boosters burn (set by the mission every frame)
+var _booster_root: Node3D
+var _b_flames: Array = []             # [{"mesh": MeshInstance3D, "mat": ShaderMaterial}]
+var _vac := 0.0
 var _er_override := -1.0
 
 
@@ -52,6 +58,8 @@ func _slot_h(slot: String, id: String) -> float:
 			return float(TANK_H[id])
 		"upper":
 			return float(UPPER_H.get(id, 0.0))
+		"booster":
+			return 0.0
 		_:
 			return float(ENGINE_H[id])
 
@@ -128,8 +136,8 @@ func set_build(b: Dictionary, with_ghosts: bool = false) -> void:
 				_parts["upper"] = up
 			continue
 		if id != "":
-			var scene: PackedScene = load("res://Assets/Models/rocket_%s_%s.glb" % [slot, id])
-			var inst: Node3D = scene.instantiate()
+			var path := "res://Assets/Models/rocket_%s_%s.glb" % [slot, id]
+			var inst: Node3D = (load(path) as PackedScene).instantiate() if ResourceLoader.exists(path) else _make_proc_part(slot, id)
 			inst.position = Vector3(0, ys[slot], 0)
 			_stack.add_child(inst)
 			_parts[slot] = inst
@@ -138,6 +146,14 @@ func set_build(b: Dictionary, with_ghosts: bool = false) -> void:
 			g.position = Vector3(0, ys[slot], 0)
 			_stack.add_child(g)
 			_ghosts[slot] = g
+	if _booster_root != null:
+		_booster_root.queue_free()
+		_booster_root = null
+	_b_flames.clear()
+	var bid := str(build.get("booster", ""))
+	if bid != "":
+		_booster_root = _make_boosters(bid, eh)
+		_stack.add_child(_booster_root)
 	if str(build.get("tank", "")) != "":
 		_add_branding(eh, th)
 	if _parts.has("nose"):
@@ -147,6 +163,160 @@ func set_build(b: Dictionary, with_ghosts: bool = false) -> void:
 	_fx_root.position = Vector3(0, -total_height() * 0.5 + 0.2, 0)
 	_flame.scale = Vector3(er * 1.15, 1.0, er * 1.15)
 	_core.scale = Vector3(er * 0.7, 1.0, er * 0.7)
+
+
+## Procedural stand-in for parts that have no Blender model yet (extra-large tank, Titan engine).
+func _make_proc_part(slot: String, id: String) -> Node3D:
+	var root := Node3D.new()
+	if slot == "tank":
+		var h := float(TANK_H[id])
+		var m := MeshInstance3D.new()
+		var c := CylinderMesh.new()
+		c.height = h
+		c.top_radius = RADIUS
+		c.bottom_radius = RADIUS
+		c.radial_segments = 48
+		m.mesh = c
+		m.position = Vector3(0, h * 0.5, 0)
+		m.material_override = _mat(Color(0.92, 0.94, 0.97), 0.25, 0.4)
+		root.add_child(m)
+		for k in 3:
+			var band := MeshInstance3D.new()
+			var bm := CylinderMesh.new()
+			bm.height = 0.7
+			bm.top_radius = RADIUS + 0.03
+			bm.bottom_radius = RADIUS + 0.03
+			bm.radial_segments = 48
+			band.mesh = bm
+			band.position = Vector3(0, h * (0.2 + 0.3 * k), 0)
+			band.material_override = _mat(Color(0.16, 0.18, 0.23), 0.4, 0.5)
+			root.add_child(band)
+	else:
+		var h := float(ENGINE_H[id])
+		var er := float(ENGINE_R[id])
+		var mount := MeshInstance3D.new()
+		var mc := CylinderMesh.new()
+		mc.height = h * 0.3
+		mc.top_radius = RADIUS
+		mc.bottom_radius = RADIUS * 0.8
+		mc.radial_segments = 40
+		mount.mesh = mc
+		mount.position = Vector3(0, h * 0.85, 0)
+		mount.material_override = _mat(Color(0.16, 0.18, 0.23), 0.5, 0.45)
+		root.add_child(mount)
+		for k in 3:
+			var bell := MeshInstance3D.new()
+			var bc := CylinderMesh.new()
+			bc.height = h * 0.8
+			bc.top_radius = er * 0.3
+			bc.bottom_radius = er * 0.55
+			bc.radial_segments = 24
+			bell.mesh = bc
+			var a := TAU * float(k) / 3.0
+			bell.position = Vector3(cos(a) * er * 0.75, h * 0.4, sin(a) * er * 0.75)
+			bell.material_override = _mat(Color(0.35, 0.37, 0.43), 0.8, 0.35)
+			root.add_child(bell)
+	return root
+
+
+## Strap-on boosters: n white cylinders around the core with a nose cone, a bell and their own exhaust.
+func _make_boosters(id: String, engine_h: float) -> Node3D:
+	var root := Node3D.new()
+	var n: int = int(BOOSTER_N[id])
+	var h: float = float(BOOSTER_H[id])
+	for i in n:
+		var b := Node3D.new()
+		var ang := TAU * float(i) / float(n) - deg_to_rad(40.0)
+		b.position = Vector3(cos(ang) * (RADIUS + 1.15), engine_h * 0.4, sin(ang) * (RADIUS + 1.15))
+		b.name = "booster_%d" % i
+		var body := MeshInstance3D.new()
+		var bc := CylinderMesh.new()
+		bc.height = h - 5.0
+		bc.top_radius = 1.0
+		bc.bottom_radius = 1.0
+		bc.radial_segments = 32
+		body.mesh = bc
+		body.position = Vector3(0, 1.5 + (h - 5.0) * 0.5, 0)
+		body.material_override = _mat(Color(0.93, 0.94, 0.96), 0.25, 0.4)
+		b.add_child(body)
+		var cone := MeshInstance3D.new()
+		var cc := CylinderMesh.new()
+		cc.height = 4.0
+		cc.top_radius = 0.08
+		cc.bottom_radius = 1.0
+		cc.radial_segments = 32
+		cone.mesh = cc
+		cone.position = Vector3(0, h - 3.5, 0)
+		cone.material_override = _mat(Color(0.14, 0.16, 0.2), 0.4, 0.5)
+		b.add_child(cone)
+		var bell := MeshInstance3D.new()
+		var bl := CylinderMesh.new()
+		bl.height = 2.0
+		bl.top_radius = 0.45
+		bl.bottom_radius = 0.85
+		bl.radial_segments = 24
+		bell.mesh = bl
+		bell.position = Vector3(0, 0.6, 0)
+		bell.material_override = _mat(Color(0.35, 0.37, 0.43), 0.8, 0.35)
+		b.add_child(bell)
+		var band := MeshInstance3D.new()
+		var bm := CylinderMesh.new()
+		bm.height = 0.5
+		bm.top_radius = 1.03
+		bm.bottom_radius = 1.03
+		bm.radial_segments = 32
+		band.mesh = bm
+		band.position = Vector3(0, h * 0.6, 0)
+		var om := _mat(Color(1.0, 0.45, 0.1), 0.2, 0.5)
+		om.emission_enabled = true
+		om.emission = Color(1.0, 0.4, 0.08)
+		om.emission_energy_multiplier = 0.3
+		band.material_override = om
+		b.add_child(band)
+		# exhaust
+		var fm := ShaderMaterial.new()
+		fm.shader = load("res://Core3D/shaders/flame.gdshader")
+		var fc := CylinderMesh.new()
+		fc.top_radius = 0.9
+		fc.bottom_radius = 0.1
+		fc.height = 1.0
+		fc.radial_segments = 20
+		var fmesh := MeshInstance3D.new()
+		fmesh.mesh = fc
+		fmesh.material_override = fm
+		fmesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		fmesh.visible = false
+		b.add_child(fmesh)
+		_b_flames.append({"mesh": fmesh, "mat": fm})
+		root.add_child(b)
+	return root
+
+
+## Throws the boosters off the stack: they keep their world transform under a new holder (returned) which the director
+## animates outwards. Their exhaust is switched off.
+func separate_boosters(new_parent: Node) -> Node3D:
+	if _booster_root == null:
+		return null
+	var holder := Node3D.new()
+	new_parent.add_child(holder)
+	holder.global_transform = _stack.global_transform
+	var kids: Array = _booster_root.get_children()
+	for k in kids:
+		var xf: Transform3D = (k as Node3D).global_transform
+		_booster_root.remove_child(k)
+		holder.add_child(k)
+		(k as Node3D).global_transform = xf
+	for f in _b_flames:
+		(f["mesh"] as MeshInstance3D).visible = false
+	_b_flames.clear()
+	_booster_root.queue_free()
+	_booster_root = null
+	booster_level = 0.0
+	return holder
+
+
+func has_boosters_attached() -> bool:
+	return _booster_root != null
 
 
 func _mat(col: Color, metal: float, rough: float) -> StandardMaterial3D:
@@ -396,6 +566,7 @@ func set_thrust(t: float, ambient: float, drift: Vector3) -> void:
 	var on := t > 0.02
 	var er := float(ENGINE_R[_id_or_default("engine")]) if _er_override < 0.0 else _er_override
 	var vac := 1.0 - clampf(ambient, 0.0, 1.0)
+	_vac = vac
 	var length := (16.0 + 34.0 * t) * (0.7 + er * 0.35) * (1.0 + vac * 0.8)
 	var width := 1.0 + vac * 1.1
 	_flame.visible = on
@@ -422,6 +593,17 @@ func set_thrust(t: float, ambient: float, drift: Vector3) -> void:
 
 func _process(delta: float) -> void:
 	_t += delta
+	# booster exhausts follow booster_level
+	for f in _b_flames:
+		var fm: MeshInstance3D = f["mesh"]
+		var on := booster_level > 0.02
+		fm.visible = on
+		if on:
+			var len := (9.0 + 18.0 * booster_level) * (1.0 + _vac * 0.6)
+			fm.scale = Vector3(1.0 + _vac * 0.8, len, 1.0 + _vac * 0.8)
+			fm.position = Vector3(0, -len * 0.5 + 0.2, 0)
+			(f["mat"] as ShaderMaterial).set_shader_parameter("intensity", booster_level * 1.1)
+			(f["mat"] as ShaderMaterial).set_shader_parameter("vac", _vac)
 	if _light != null and _thrust > 0.02:
 		_light.light_energy = _thrust * 9.0 * (0.85 + 0.15 * sin(_t * 41.0))
 	if _holo != null:

@@ -5,6 +5,7 @@ extends PanelContainer
 ## hint reacts to the flight state. Compact on purpose: it must never overlap the rest of the HUD.
 
 signal separate_requested
+signal boosters_requested
 signal fairing_requested
 
 const W := 236.0
@@ -14,6 +15,7 @@ var _chip2: Label
 var _fuel: ProgressBar
 var _fuel_lbl: Label
 var _sep_btn: Button
+var _boost_btn: Button
 var _fair_btn: Button
 var _hint: Label
 var _t := 0.0
@@ -28,8 +30,8 @@ func setup(m: FlightModel) -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_CENTER_RIGHT)
 	offset_left = -W - 16.0
 	offset_right = -16.0
-	offset_top = -104.0
-	offset_bottom = 112.0
+	offset_top = -124.0
+	offset_bottom = 124.0
 	grow_vertical = Control.GROW_DIRECTION_BOTH
 	add_theme_stylebox_override("panel", UIKit.box(Color(0.03, 0.07, 0.14, 0.82), UIKit.C_BORDER, 10, 1, 8))
 	var v := UIKit.vbox(5)
@@ -51,6 +53,10 @@ func setup(m: FlightModel) -> void:
 	_fuel_lbl.custom_minimum_size.x = 38
 	fr.add_child(_fuel_lbl)
 	v.add_child(fr)
+	_boost_btn = _button("STG_BOOSTERS", "BoosterButton")
+	_boost_btn.pressed.connect(func(): boosters_requested.emit())
+	_boost_btn.visible = m.has_boosters
+	v.add_child(_boost_btn)
 	_sep_btn = _button("STG_SEPARATE", "SeparateButton")
 	_sep_btn.pressed.connect(func(): separate_requested.emit())
 	v.add_child(_sep_btn)
@@ -107,6 +113,11 @@ func refresh(delta: float) -> void:
 	_fuel.value = m.fuel_fraction() * 100.0
 	_fuel_lbl.text = "%d%%" % int(m.fuel_fraction() * 100.0)
 	UIKit.set_bar_color(_fuel, UIKit.C_BAD if m.fuel_fraction() < 0.1 else UIKit.C_ORANGE)
+	_boost_btn.visible = m.has_boosters or m.b_waste >= 0.0
+	_boost_btn.disabled = not m.has_boosters
+	var b_now := m.has_boosters and m.b_fuel <= 0.0
+	_boost_btn.modulate = Color(1.0, 0.7 + 0.3 * pulse, 0.45, 1.0) if b_now else Color.WHITE
+	_boost_btn.text = "STG_BOOSTERS" if m.has_boosters else "STG_BOOSTERS_OFF"
 	var can_sep := m.has_upper and m.stage == 1
 	_sep_btn.disabled = not can_sep
 	_sep_btn.visible = m.has_upper
@@ -119,7 +130,12 @@ func refresh(delta: float) -> void:
 	_fair_btn.text = "STG_FAIRING" if m.fairing_on else "STG_FAIRING_OFF"
 	var key := "STG_HINT_IDLE"
 	var col := UIKit.C_MUTED
-	if m.has_upper and m.stage == 1 and m.fuel <= 0.0:
+	if m.has_boosters and m.b_fuel <= 0.0:
+		key = "STG_HINT_BOOST_EMPTY"
+		col = UIKit.C_BAD
+	elif m.has_boosters:
+		key = "STG_HINT_BOOST"
+	elif m.has_upper and m.stage == 1 and m.fuel <= 0.0:
 		key = "STG_HINT_EMPTY"
 		col = UIKit.C_BAD
 	elif sep_now:

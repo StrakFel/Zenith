@@ -7,10 +7,17 @@ Godot 4.7 (GL Compatibility), GDScript only, all art is drawn procedurally (no e
 
 | # | Mission | Status |
 |---|---------|--------|
-| 1 | Rocket Assembly & Launch - drag-and-drop build (mass, fuel, thrust, TWR, delta-v, cost), countdown, gravity-turn flight with Max-Q, orbit insertion, satellite deployment | playable |
-| 2 | Lunar Expedition - mission design lab (site, launcher, lander, rover, instrument, power, antenna), verification, launch, trans-lunar burn planner, powered landing, rover science, data uplink | playable |
-| 3 | ISS Expedition - cargo/experiment design lab, verification, launch, then RCS docking with the station (fuel and fragile cargo come from the design) | playable |
-| 4-5 | locked placeholders | registered in `Core/mission_registry.gd` |
+| 1 | **First Launch** - design the satellite and the rocket (stages, fairing), launch, deploy, downlink | playable, balanced (8748 designs analysed) |
+| 2 | **Space Operations** - design the EVA package (oxygen / gas / suit) and its rocket, launch, then the spacewalk repair | playable |
+| 3 | **ISS Expedition** - design the science cargo + rocket, launch to the station, rendezvous and dock | playable |
+| 4 | **Satellite Constellation** - heavy multi-stage rocket with strap-on boosters, launch N satellites, deploy them into evenly spaced slots (phasing) | playable prototype |
+| 5 | **Moon & Return** - heavy launch system, trans-lunar burn, landing + rover science, ascent, trans-Earth burn, re-entry | playable; the three return legs are a prototype (decisions with real numbers, no flight simulation) |
+
+Every mission follows the same loop: **payload lab -> rocket designer -> Mission Validation -> launch -> hand-off -> operations -> results**.
+The shared launch segment is the Mission 1 scene configured by a `LaunchProfile` (`Missions/Shared/launch_profiles.gd`);
+the launch result (hull, orbit, propellant left, reliability, cost) is handed to the operations scene through `GameState.session`
+and changes what the operations phase gives. New rocket parts unlock with the campaign (`M1Parts.UNLOCK`): tank XL (M2),
+cryogenic upper stage (M3), strap-on boosters (M4), Titan engine and trans-lunar stage (M5).
 
 ## Project layout
 
