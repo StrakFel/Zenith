@@ -58,14 +58,14 @@ func _ready() -> void:
 	left.offset_left = 16
 	left.offset_right = 16 + PANEL_W
 	left.offset_top = 16
-	left.offset_bottom = -68
+	left.offset_bottom = -16
 	add_child(left)
 	var right := _build_right()
 	right.set_anchors_and_offsets_preset(Control.PRESET_RIGHT_WIDE)
 	right.offset_left = -16 - PANEL_W
 	right.offset_right = -16
 	right.offset_top = 16
-	right.offset_bottom = -68
+	right.offset_bottom = -16
 	right.grow_horizontal = Control.GROW_DIRECTION_BEGIN     # if the content is wider it grows to the left, never off-screen
 	add_child(right)
 	_rebuild_sat()

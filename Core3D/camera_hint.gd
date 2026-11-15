@@ -43,6 +43,7 @@ func setup(mission_mode: bool, top: float = -1.0, right: bool = false) -> void:
 	_banner.add_child(b)
 	_banner.visible = false
 	add_child(_banner)
+	_panel.visible = false          # the camera tips panel is switched off everywhere (the INSPECT banner stays)
 	_layout()
 
 
@@ -131,7 +132,7 @@ func set_bottom(on: bool, seconds: float = 0.0, middle: bool = false) -> void:
 		_fade = create_tween()
 		_fade.tween_interval(seconds)
 		_fade.tween_property(_panel, "modulate:a", 0.0, 0.8)
-	_panel.visible = true
+	_panel.visible = false
 
 
 ## F1: show / hide the camera help by hand.
@@ -165,4 +166,4 @@ func set_compact(on: bool) -> void:
 
 func set_inspect(on: bool) -> void:
 	_banner.visible = on
-	_panel.visible = not on
+	_panel.visible = false

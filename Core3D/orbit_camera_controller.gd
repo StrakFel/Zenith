@@ -201,6 +201,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
+		if mb.pressed:
+			# a wheel turn / click that lands on an opaque UI panel (e.g. the end of a scrolled list) never reaches the camera
+			var hov := camera.get_viewport().gui_get_hovered_control()
+			if hov != null and hov.mouse_filter == Control.MOUSE_FILTER_STOP:
+				return
 		match mb.button_index:
 			MOUSE_BUTTON_LEFT:
 				if mb.pressed:
