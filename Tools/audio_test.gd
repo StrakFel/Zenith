@@ -24,6 +24,10 @@ func _frames(n: int) -> void:
 		await process_frame
 
 
+func i_frames() -> int:
+	return Engine.get_process_frames()
+
+
 func _loud() -> int:
 	var n := 0
 	for p in _am._players:
@@ -35,9 +39,18 @@ func _loud() -> int:
 func _run() -> void:
 	await _frames(5)
 	_am = root.get_node("AudioManager")
+	# start-up latency: the music must be playing and audible within about half a second of the game start
+	var t0 := Time.get_ticks_msec()
+	var audible_ms := -1
+	for i in 120:
+		if _am._active.playing and _am._active.volume_db > -12.0:
+			audible_ms = Time.get_ticks_msec() - t0
+			break
+		await process_frame
+	_check(_am._active.playing and _am._active.volume_db > -12.0, "start-up: music audible (>-12 dB) %d frames after the first process frame" % [i_frames()])
 	_gs = root.get_node("GameState")
 	_gs.settings["music_on"] = true
-	_gs.settings["music_volume"] = 0.7
+	_gs.settings["music_volume"] = 1.0
 	_gs.settings["sfx_volume"] = 0.8
 	_gs.settings["unlock_all"] = true
 	_gs.apply_settings()
@@ -101,7 +114,7 @@ func _run() -> void:
 	var cfg := ConfigFile.new()
 	cfg.load(_gs.save_path)
 	_check(is_equal_approx(float(cfg.get_value("settings", "music_volume", -1.0)), 0.3), "settings are saved to disk")
-	_gs.settings["music_volume"] = 0.7
+	_gs.settings["music_volume"] = 1.0
 	_gs.settings["sfx_volume"] = 0.8
 	_gs.settings["unlock_all"] = false
 	_gs.save_game()

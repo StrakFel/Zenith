@@ -12,7 +12,8 @@ var save_path: String = TEST_SAVE_PATH if OS.get_cmdline_args().has("--script") 
 var settings: Dictionary = {
 	"locale": "en",
 	"volume": 0.8,
-	"music_volume": 0.7,
+	"music_volume": 1.0,
+	"audio_ver": 2,
 	"sfx_volume": 0.8,
 	"music_on": true,
 	"display_mode": "fullscreen",   # "fullscreen" (default) or "windowed"; Alt+Enter toggles
@@ -166,6 +167,9 @@ func load_game() -> void:
 		return
 	for k in settings:
 		settings[k] = cfg.get_value("settings", k, settings[k])
+	if int(cfg.get_value("settings", "audio_ver", 0)) < 2:      # music was re-balanced (louder tracks): reset its slider once
+		settings["music_volume"] = 1.0
+		settings["audio_ver"] = 2
 	if not cfg.has_section_key("settings", "flight_mode"):      # saves from before the single flight-mode selector
 		settings["flight_mode"] = "auto" if bool(settings["autoflight"]) else ("assisted" if bool(settings["guided"]) else "manual")
 	var raw: Variant = JSON.parse_string(str(cfg.get_value("progress", "data", "{}")))
