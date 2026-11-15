@@ -19,8 +19,8 @@ const DATA: Dictionary = {
 	"M5_DESC": ["The hardest mission: a heavy launch system, a lunar landing with a rover, and the way home - ascent, trans-Earth burn and re-entry.", "Найскладніша місія: важка ракетна система, посадка на Місяць із марсоходом і шлях додому - зліт, перельот до Землі та вхід в атмосферу."],
 	"MS_M5_SKILL": ["Heavy launch design, trans-lunar delta-v budget, landing, surface science, return corridor and heat shield.", "Проєктування важкої ракети, бюджет delta-v до Місяця, посадка, наука на поверхні, коридор повернення й теплозахист."],
 	# ---- autopilot (default) and take-over
-	"HUD_AUTO_ON": ["AUTOPILOT flying\nany key / M = take over", "ПІЛОТ-АВТОМАТ летить\nбудь-яка клавіша / M = керувати"],
-	"HUD_AUTO_OFF": ["MANUAL control\nM = autopilot", "РУЧНЕ керування\nM = автопілот"],
+	"HUD_AUTO_ON": ["AUTOPILOT  [M]", "АВТОПІЛОТ  [M]"],
+	"HUD_AUTO_OFF": ["MANUAL  [M]", "РУЧНЕ  [M]"],
 	"AP_TOAST_ON": ["AUTOPILOT ENGAGED", "АВТОПІЛОТ УВІМКНЕНО"],
 	"AP_TOAST_OFF": ["MANUAL CONTROL - you are flying", "РУЧНЕ КЕРУВАННЯ - ви за штурвалом"],
 	"AP_NOW": ["Autopilot:", "Автопілот:"],

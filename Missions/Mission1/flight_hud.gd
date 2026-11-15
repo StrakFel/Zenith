@@ -108,7 +108,9 @@ func build() -> void:
 	br.offset_right = -16
 	br.offset_bottom = -16
 	br.offset_left = -190
-	br.offset_top = -214
+	br.offset_top = -17
+	br.grow_vertical = Control.GROW_DIRECTION_BEGIN     # taller content grows upwards, never below the screen edge
+	br.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	add_child(br)
 	var av := UIKit.vbox(4)
 	br.add_child(av)
