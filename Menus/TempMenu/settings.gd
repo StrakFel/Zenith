@@ -26,9 +26,16 @@ func _ready() -> void:
 	screen.add_child(margin)
 	var p := UIKit.panel()
 	margin.add_child(p)
-	var v := UIKit.vbox(14)
-	p.add_child(v)
-	v.add_child(UIKit.label("SET_TITLE", 40, Color.WHITE))
+	var outer := UIKit.vbox(8)
+	p.add_child(outer)
+	var sc := ScrollContainer.new()          # small windows: the options scroll, Back stays pinned
+	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	outer.add_child(sc)
+	var v := UIKit.vbox(9)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sc.add_child(v)
+	v.add_child(UIKit.label("SET_TITLE", 34, Color.WHITE))
 	v.add_child(HSeparator.new())
 
 	# Language
@@ -68,7 +75,14 @@ func _ready() -> void:
 	sens.value_changed.connect(func(val: float): GameState.set_setting("sens", val))
 	v.add_child(sens)
 
-	v.add_child(_toggle("SET_FULLSCREEN", "fullscreen"))
+	v.add_child(UIKit.label("SET_DISPLAY", 20, UIKit.C_ACCENT))
+	v.add_child(_choice_row([["SET_WINDOWED", "windowed"], ["SET_FULLSCREEN", "fullscreen"]], str(GameState.settings["display_mode"]),
+		func(id: String): GameState.set_setting("display_mode", id)))
+	var dh := UIKit.label("SET_DISPLAY_HINT", 12, UIKit.C_MUTED)
+	v.add_child(dh)
+	v.add_child(UIKit.label("SET_FLIGHT_MODE", 20, UIKit.C_ACCENT))
+	v.add_child(_choice_row([["FM_AUTO", "auto"], ["FM_ASSISTED", "assisted"], ["FM_MANUAL", "manual"]], str(GameState.settings["flight_mode"]),
+		func(id: String): GameState.set_flight_mode(id)))
 	v.add_child(_toggle("SET_SHAKE", "shake"))
 	v.add_child(_toggle("SET_UNLOCK_ALL", "unlock_all"))
 
@@ -78,10 +92,27 @@ func _ready() -> void:
 
 	var back := UIKit.button("BTN_BACK", Vector2(200, 48))
 	back.pressed.connect(func(): Router.go_to(Router.MAIN_MENU))
-	v.add_child(back)
+	outer.add_child(back)
 	var cam_hint := CameraHint.new()
 	screen.add_child(cam_hint)
 	cam_hint.setup(false, -1.0, true)
+
+
+## Row of exclusive toggle buttons: items = [[caption key, id], ...].
+func _choice_row(items: Array, current: String, on_pick: Callable) -> Control:
+	var row := UIKit.hbox(10)
+	var group := ButtonGroup.new()
+	for it in items:
+		var b := Button.new()
+		b.text = str(it[0])
+		b.toggle_mode = true
+		b.button_group = group
+		b.custom_minimum_size = Vector2(150, 44)
+		b.focus_mode = Control.FOCUS_NONE
+		b.button_pressed = str(it[1]) == current
+		b.pressed.connect(on_pick.bind(str(it[1])))
+		row.add_child(b)
+	return row
 
 
 func _toggle(key: String, setting: String) -> CheckButton:

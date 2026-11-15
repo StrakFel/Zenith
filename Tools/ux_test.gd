@@ -109,7 +109,9 @@ func _run() -> void:
 	_check(not hint_rect.intersects(tabs_rect), "camera hint does not overlap the part tabs")
 	# required parts are marked and the missing list is explicit
 	_check(m.assembly._ready_label.text.contains("Still needed") or m.assembly._ready_label.text.contains("M1_MISSING") or m.assembly._ready_label.text != "", "designer lists what is still missing")
-	await _press("StarterButton") if _find_btn(root, "M1_STARTER") == null else await _press("M1_STARTER")
+	_check(not m.assembly._starter_btn.visible, "demo rocket button is hidden outside Demo Mode")
+	for sl in m.assembly.STARTER:
+		m.assembly._on_install(sl, str(m.assembly.STARTER[sl]))
 	await _frames(10)
 	_check(str(m.assembly.build["engine"]) != "" and str(m.assembly.build["tank"]) != "" and str(m.assembly.build["nose"]) != "", "starter rocket fills the required slots")
 	await _press("BTN_BACK")

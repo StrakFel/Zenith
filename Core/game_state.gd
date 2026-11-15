@@ -12,9 +12,10 @@ var save_path: String = TEST_SAVE_PATH if OS.get_cmdline_args().has("--script") 
 var settings: Dictionary = {
 	"locale": "en",
 	"volume": 0.8,
-	"fullscreen": false,
+	"display_mode": "fullscreen",   # "fullscreen" (default) or "windowed"; Alt+Enter toggles
 	"shake": true,
 	"unlock_all": false,
+	"flight_mode": "auto",          # "auto" (autopilot) / "assisted" (coach, you fly) / "manual" (no help)
 	"autoflight": true,   # after the design the autopilot flies the rocket (the player can take over at any time)
 	"guided": true,    # Guided Launch: the flight guide shows the next step and holds the pitch profile
 	"sens": 1.0,   # control sensitivity multiplier (0.5 - 1.5)
@@ -42,11 +43,45 @@ func apply_settings() -> void:
 	Loc.set_locale(str(settings["locale"]))
 	var vol: float = float(settings["volume"])
 	AudioServer.set_bus_volume_db(0, linear_to_db(maxf(vol, 0.0001)))
-	var want_full: bool = bool(settings["fullscreen"])
+	_apply_display()
+
+
+## Windowed / fullscreen. Skipped in headless runs, automated tests and the editor-embedded game window.
+func _apply_display() -> void:
+	if DisplayServer.get_name() == "headless" or OS.get_cmdline_args().has("--script") or Engine.is_embedded_in_editor():
+		return
+	var want_full := str(settings["display_mode"]) == "fullscreen"
 	var is_full := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
-	if want_full != is_full:
-		DisplayServer.window_set_mode(
-			DisplayServer.WINDOW_MODE_FULLSCREEN if want_full else DisplayServer.WINDOW_MODE_WINDOWED)
+	if want_full and not is_full:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+	elif not want_full and is_full:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+		var scr := DisplayServer.screen_get_size()
+		var sz := Vector2i(mini(1280, int(scr.x * 0.9)), mini(720, int(scr.y * 0.9)))
+		DisplayServer.window_set_size(sz)
+		DisplayServer.window_set_position((scr - sz) / 2)
+
+
+## One selector instead of two switches: "auto", "assisted" or "manual".
+func set_flight_mode(mode: String) -> void:
+	settings["flight_mode"] = mode
+	settings["autoflight"] = mode == "auto"      # the autopilot flies
+	settings["guided"] = mode != "manual"        # the coach shows the next step (and, after a take-over, helps the pilot)
+	save_game()
+	settings_changed.emit()
+
+
+func toggle_fullscreen() -> void:
+	set_setting("display_mode", "windowed" if str(settings["display_mode"]) == "fullscreen" else "fullscreen")
+
+
+## Alt+Enter (or F11) switches windowed / fullscreen from any screen.
+func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo:
+		var k := event as InputEventKey
+		if (k.alt_pressed and (k.keycode == KEY_ENTER or k.keycode == KEY_KP_ENTER)) or k.keycode == KEY_F11:
+			toggle_fullscreen()
+			get_viewport().set_input_as_handled()
 
 
 # ---------------------------------------------------------------- progress --
@@ -128,6 +163,8 @@ func load_game() -> void:
 		return
 	for k in settings:
 		settings[k] = cfg.get_value("settings", k, settings[k])
+	if not cfg.has_section_key("settings", "flight_mode"):      # saves from before the single flight-mode selector
+		settings["flight_mode"] = "auto" if bool(settings["autoflight"]) else ("assisted" if bool(settings["guided"]) else "manual")
 	var raw: Variant = JSON.parse_string(str(cfg.get_value("progress", "data", "{}")))
 	if raw is Dictionary:
 		progress.clear()

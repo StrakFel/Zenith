@@ -3,8 +3,9 @@ extends RefCounted
 ## Camera controls + mission-select screen texts.
 
 const DATA: Dictionary = {
-	"CAM_HINT_MENU": ["Camera: hold LMB and drag - rotate 360 | wheel - zoom | hold RMB and drag - pan | R - reset | double-click an object - focus",
-		"Камера: ЛКМ + рух миші - обертання 360° | коліщатко - масштаб | ПКМ + рух - зсув точки огляду | R - скидання | подвійний клік по об'єкту - фокус"],
+	"CAM_HINT_MENU": ["Camera (over the 3D view): LMB drag - rotate | wheel - zoom | RMB drag - pan | R - reset | F1 - hide / show",
+		"Камера (над 3D-сценою): ЛКМ - обертання | колесо - масштаб | ПКМ - зсув | R - скидання | F1 - сховати / показати"],
+	"CAM_HINT_SHORT": ["Camera: LMB drag - rotate | wheel - zoom | RMB drag - pan | F1 - hide / show", "Камера: ЛКМ - обертання | колесо - масштаб | ПКМ - зсув | F1 - сховати / показати"],
 	"CAM_HINT_MISSION": ["C - free camera (pauses the simulation so you can inspect safely)",
 		"C - вільна камера (ставить симуляцію на паузу, щоб безпечно оглядати)"],
 	"CAM_INSPECT": ["INSPECT MODE - simulation paused. LMB drag rotate | wheel zoom | RMB drag pan | double-click focus | C or R to resume",

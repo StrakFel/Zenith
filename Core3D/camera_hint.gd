@@ -12,6 +12,7 @@ var _compact := false
 var _hud_corner := false
 var _bottom := false
 var _user_hidden := false
+var _bottom_mid := false
 var _fade: Tween
 
 
@@ -48,9 +49,14 @@ func setup(mission_mode: bool, top: float = -1.0, right: bool = false) -> void:
 func _layout() -> void:
 	if _bottom:
 		# assembly screens: between the side panels at the bottom, never over the part tabs / cards
-		_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-		_panel.offset_left = 16
-		_panel.offset_right = 330
+		if _bottom_mid:      # between the two side panels of the design screen
+			_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+			_panel.offset_left = -136
+			_panel.offset_right = 136
+		else:                # left, in the free 3D area next to the designer panel
+			_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+			_panel.offset_left = 16
+			_panel.offset_right = 330
 		_panel.offset_bottom = -12
 		_panel.offset_top = -12
 		_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
@@ -83,16 +89,16 @@ func _layout() -> void:
 		_panel.offset_right = 165 if _compact else 215
 	elif _right:
 		_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
-		_panel.offset_left = -452
-		_panel.offset_right = -16
-		_panel.offset_bottom = -16
-		_panel.offset_top = -62
+		_panel.offset_left = -440
+		_panel.offset_right = -40
+		_panel.offset_bottom = -44
+		_panel.offset_top = -92
 	else:
 		_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-		_panel.offset_left = 16
-		_panel.offset_bottom = -16
-		_panel.offset_top = -62
-		_panel.offset_right = 452
+		_panel.offset_left = 40
+		_panel.offset_bottom = -44
+		_panel.offset_top = -92
+		_panel.offset_right = 440
 	_banner.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	_banner.offset_top = (_top if _top >= 0.0 else 16.0) + 4.0
 	_banner.offset_left = -330
@@ -108,10 +114,14 @@ func set_mission_mode(on: bool, top: float = -2.0) -> void:
 
 
 ## Bottom-centre placement + fade-out after `seconds` (F1 shows it again). Used on the assembly screens.
-func set_bottom(on: bool, seconds: float = 0.0) -> void:
+func set_bottom(on: bool, seconds: float = 0.0, middle: bool = false) -> void:
 	_bottom = on
+	_bottom_mid = middle
 	if on:
-		_label.custom_minimum_size.x = 292.0
+		_label.custom_minimum_size.x = 250.0 if middle else 292.0
+		_label.text = "CAM_HINT_SHORT"
+	else:
+		_label.text = "CAM_HINT_MISSION" if _mission_mode else "CAM_HINT_MENU"
 	_layout()
 	_panel.modulate.a = 1.0
 	_user_hidden = false
@@ -130,6 +140,13 @@ func toggle_help() -> void:
 		_fade.kill()
 	_user_hidden = not _user_hidden and _panel.modulate.a > 0.5
 	_panel.modulate.a = 0.0 if _user_hidden else 1.0
+
+
+## F1 works on every screen that has a camera hint (the hint owns its key, screens do not need to forward it).
+func _unhandled_key_input(event: InputEvent) -> void:
+	var k := event as InputEventKey
+	if k != null and k.pressed and not k.echo and k.keycode == KEY_F1 and is_visible_in_tree() and not _banner.visible:
+		toggle_help()
 
 
 ## Flight-HUD placement (top-right under the clock / bottom-centre banner) - no overlap with the task panel.

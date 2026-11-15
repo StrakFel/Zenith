@@ -76,6 +76,13 @@ func _click_at(pos: Vector2) -> void:
 func _click(c: Control) -> bool:
 	if c == null or not c.is_visible_in_tree():
 		return false
+	var par := c.get_parent()
+	while par != null:                       # like a real player: scroll the list until the button is on screen
+		if par is ScrollContainer:
+			(par as ScrollContainer).ensure_control_visible(c)
+			await _frames(3)
+			break
+		par = par.get_parent()
 	await _click_at(c.get_global_rect().get_center())
 	return true
 

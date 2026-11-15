@@ -8,6 +8,8 @@ signal back_requested            # one step back: to the payload / satellite des
 signal missions_requested        # leave to the mission list
 
 const TAB_KEYS := {"upper": "M1_TAB_UPPER", "booster": "M1_TAB_BOOSTER"}      # short tab captions
+## Width of the single designer panel (the rest of the screen is the 3D rocket view).
+const PANEL_W := 560.0
 const REQUIRED := ["nose", "tank", "engine"]
 ## Safe starter rocket (not an optimal one): fairing + medium tank + Kestrel engine.
 const STARTER := {"nose": "std", "tank": "m", "engine": "kestrel"}
@@ -202,6 +204,7 @@ var _stat_labels: Dictionary = {}
 var _cost_bar: ProgressBar
 var _ready_label: Label
 var _launch: Button
+var _starter_btn: Button
 
 
 func _ready() -> void:
@@ -223,149 +226,133 @@ func _ready() -> void:
 	_canvas.scene3d = scene3d
 	_canvas.part_dropped.connect(_on_install)
 	cols.add_child(_canvas)                    # the rocket stands here (left), the designer is ONE wide panel (right)
-	var merged := UIKit.panel()
-	merged.custom_minimum_size = Vector2(800, 0)
-	var hb := UIKit.hbox(12)
-	merged.add_child(hb)
-	var lp := _build_left()
-	var rp := _build_right()
-	for pnl in [lp, rp]:
-		var flat := StyleBoxEmpty.new()
-		flat.content_margin_left = 4
-		flat.content_margin_right = 4
-		(pnl as PanelContainer).add_theme_stylebox_override("panel", flat)
-	lp.custom_minimum_size = Vector2(340, 0)
-	rp.custom_minimum_size = Vector2(420, 0)
-	rp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hb.add_child(lp)
-	hb.add_child(VSeparator.new())
-	hb.add_child(rp)
-	cols.add_child(merged)
+	cols.add_child(_build_panel())
 	_show_tab("engine")
 	if scene3d != null:
 		scene3d.set_build(build, true)
 	_refresh()
 
 
-func _build_left() -> Control:
+## ONE compact designer block on the right (the big free area on the left belongs to the 3D rocket view).
+func _build_panel() -> Control:
 	var p := UIKit.panel()
-	p.custom_minimum_size = Vector2(330, 0)
-	# everything scrolls except the pinned "design review" button, so it is always reachable (small windows, 4 slots)
-	var outer := UIKit.vbox(8)
+	p.custom_minimum_size = Vector2(PANEL_W, 0)
+	var outer := UIKit.vbox(5)
 	p.add_child(outer)
-	var sc := ScrollContainer.new()
-	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	outer.add_child(sc)
-	var v := UIKit.vbox(6)
-	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	sc.add_child(v)
-	v.add_child(UIKit.label("M1_ASM_TITLE", 26, Color.WHITE))
-	var asm_hint := UIKit.label("M1_ASM_HINT", 13, UIKit.C_MUTED)
-	asm_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	asm_hint.custom_minimum_size.x = 290
-	v.add_child(asm_hint)
-	v.add_child(HSeparator.new())
-	for slot in _slots():
-		var row := UIKit.hbox(6)
-		var name_col := UIKit.vbox(0)
-		name_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var title_l := UIKit.label(SLOT_KEYS[slot], 12, UIKit.C_MUTED)
-		name_col.add_child(title_l)
-		var val := UIKit.label("M1_EMPTY", 17, UIKit.C_TEXT)
-		name_col.add_child(val)
-		row.add_child(name_col)
-		var rm := UIKit.button("M1_REMOVE", Vector2(86, 32))
-		rm.add_theme_font_size_override("font_size", 14)
-		rm.pressed.connect(func(): _on_install(slot, ""))
-		row.add_child(rm)
-		v.add_child(row)
-		_slot_rows[slot] = {"label": val, "remove": rm, "title": title_l}
-	var starter := UIKit.button("M1_STARTER", Vector2(0, 34))
+	# --- header
+	var head := UIKit.hbox(8)
+	head.add_child(UIKit.label("M1_ASM_TITLE", 24, Color.WHITE))
+	var sp := Control.new()
+	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(sp)
+	var starter := UIKit.button("M1_STARTER", Vector2(0, 30))
 	starter.name = "StarterButton"
-	starter.add_theme_font_size_override("font_size", 14)
+	starter.add_theme_font_size_override("font_size", 13)
 	starter.tooltip_text = "M1_STARTER_TIP"
 	starter.pressed.connect(func():
 		for sl in STARTER:
 			_on_install(sl, str(STARTER[sl])))
-	v.add_child(starter)
-	v.add_child(HSeparator.new())
-	v.add_child(UIKit.label("M1_STATS", 18, UIKit.C_ACCENT))
-	var g := GridContainer.new()
-	g.columns = 2
-	g.add_theme_constant_override("h_separation", 12)
-	g.add_theme_constant_override("v_separation", 2)
-	v.add_child(g)
-	for r in [["M1_ST_TOTAL_MASS", "mass"], ["M1_ST_FUEL", "fuel"], ["M1_ST_THRUST", "thrust"],
-			["M1_ST_TWR", "twr"], ["M1_ST_DV", "dv"], ["M1_ST_STAGES", "stages"], ["M1_ST_REL", "rel"]]:
-		var k := UIKit.label(r[0], 15, UIKit.C_MUTED)
-		k.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		g.add_child(k)
-		var val2 := UIKit.label("-", 16, Color.WHITE, HORIZONTAL_ALIGNMENT_RIGHT)
-		g.add_child(val2)
-		_stat_labels[r[1]] = val2
-	var cost_row := UIKit.hbox(8)
-	cost_row.add_child(UIKit.label("M1_ST_COST", 15, UIKit.C_MUTED))
-	_stat_labels["cost"] = UIKit.label("%s / %s" % [Units.money(0), Units.money(M1Parts.active_budget)], 16, UIKit.C_WARN, HORIZONTAL_ALIGNMENT_RIGHT)
-	_stat_labels["cost"].size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	cost_row.add_child(_stat_labels["cost"])
-	v.add_child(cost_row)
-	_cost_bar = UIKit.progress_bar(UIKit.C_WARN, Vector2(0, 12))
-	v.add_child(_cost_bar)
-	v.add_child(HSeparator.new())
-	_ready_label = UIKit.label("", 15, UIKit.C_TEXT)
-	_ready_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_ready_label.custom_minimum_size = Vector2(290, 70)
-	v.add_child(_ready_label)
-	_launch = UIKit.button("M1_TO_REVIEW", Vector2(0, 54))
-	_launch.add_theme_font_size_override("font_size", 22)
-	_launch.pressed.connect(func(): launch_requested.emit(build.duplicate()))
-	outer.add_child(_launch)
-	var nav := UIKit.hbox(6)
-	var back := UIKit.button("BTN_BACK", Vector2(0, 38))
-	back.name = "BackButton"
-	back.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	back.add_theme_font_size_override("font_size", 15)
-	back.pressed.connect(func(): back_requested.emit())
-	nav.add_child(back)
-	var miss := UIKit.button("BTN_MISSIONS", Vector2(0, 38))
-	miss.name = "MissionsButton"
-	miss.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	miss.add_theme_font_size_override("font_size", 15)
-	miss.pressed.connect(func(): missions_requested.emit())
-	nav.add_child(miss)
-	outer.add_child(nav)
-	return p
-
-
-func _build_right() -> Control:
-	var p := UIKit.panel()
-	p.custom_minimum_size = Vector2(410, 0)
-	var v := UIKit.vbox(8)
-	p.add_child(v)
-	v.add_child(UIKit.label("M1_CATALOG", 22, Color.WHITE))
-	var tabs := UIKit.hbox(6)
-	v.add_child(tabs)
+	_starter_btn = starter
+	starter.visible = bool(GameState.settings["unlock_all"])      # Demo Mode only
+	head.add_child(starter)
+	outer.add_child(head)
+	var asm_hint := UIKit.label("M1_ASM_HINT", 12, UIKit.C_MUTED)
+	asm_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	asm_hint.custom_minimum_size.x = PANEL_W - 40
+	outer.add_child(asm_hint)
+	# --- part tabs + cards
+	var tabs := UIKit.hbox(5)
+	outer.add_child(tabs)
 	var group := ButtonGroup.new()
 	for slot in _tab_slots():
 		var b := Button.new()
 		b.text = TAB_KEYS.get(slot, SLOT_KEYS[slot])
-		b.add_theme_font_size_override("font_size", 16)
+		b.add_theme_font_size_override("font_size", 15)
 		b.toggle_mode = true
 		b.button_group = group
 		b.focus_mode = Control.FOCUS_NONE
-		b.custom_minimum_size = Vector2(0, 38)
+		b.custom_minimum_size = Vector2(0, 34)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.pressed.connect(_show_tab.bind(slot))
 		tabs.add_child(b)
 		_tab_buttons[slot] = b
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.custom_minimum_size.y = 120
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	v.add_child(scroll)
-	_cards_box = UIKit.vbox(8)
+	outer.add_child(scroll)
+	_cards_box = UIKit.vbox(6)
 	_cards_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(_cards_box)
+	outer.add_child(HSeparator.new())
+	# --- installed parts: one aligned row per slot
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 2)
+	outer.add_child(grid)
+	for slot in _slots():
+		var title_l := UIKit.label(SLOT_KEYS[slot], 14, UIKit.C_MUTED)
+		title_l.custom_minimum_size.x = 150
+		grid.add_child(title_l)
+		var val := UIKit.label("M1_EMPTY", 15, UIKit.C_TEXT)
+		val.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		val.clip_text = true
+		grid.add_child(val)
+		var rm := UIKit.button("M1_REMOVE", Vector2(78, 24))
+		rm.add_theme_font_size_override("font_size", 12)
+		for sn in ["normal", "hover", "pressed", "disabled"]:      # slim button: the slot rows stay one line high
+			rm.add_theme_stylebox_override(sn, UIKit.box(Color(0.06, 0.12, 0.24, 0.9 if sn != "disabled" else 0.4), UIKit.C_BORDER if sn != "disabled" else Color(0.2, 0.3, 0.45, 0.5), 6, 1, 3))
+		rm.pressed.connect(func(): _on_install(slot, ""))
+		grid.add_child(rm)
+		_slot_rows[slot] = {"label": val, "remove": rm, "title": title_l}
+	outer.add_child(HSeparator.new())
+	# --- stats: four columns (label value | label value)
+	var g := GridContainer.new()
+	g.columns = 4
+	g.add_theme_constant_override("h_separation", 10)
+	g.add_theme_constant_override("v_separation", 2)
+	outer.add_child(g)
+	for r in [["M1_ST_TOTAL_MASS", "mass"], ["M1_ST_TWR", "twr"], ["M1_ST_FUEL", "fuel"], ["M1_ST_DV", "dv"],
+			["M1_ST_THRUST", "thrust"], ["M1_ST_STAGES", "stages"], ["M1_ST_REL", "rel"]]:
+		var k := UIKit.label(r[0], 14, UIKit.C_MUTED)
+		k.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		g.add_child(k)
+		var val2 := UIKit.label("-", 15, Color.WHITE, HORIZONTAL_ALIGNMENT_RIGHT)
+		val2.custom_minimum_size.x = 80
+		g.add_child(val2)
+		_stat_labels[r[1]] = val2
+	var cost_row := UIKit.hbox(8)
+	cost_row.add_child(UIKit.label("M1_ST_COST", 14, UIKit.C_MUTED))
+	_stat_labels["cost"] = UIKit.label("%s / %s" % [Units.money(0), Units.money(M1Parts.active_budget)], 15, UIKit.C_WARN, HORIZONTAL_ALIGNMENT_RIGHT)
+	_stat_labels["cost"].size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cost_row.add_child(_stat_labels["cost"])
+	outer.add_child(cost_row)
+	_cost_bar = UIKit.progress_bar(UIKit.C_WARN, Vector2(0, 10))
+	outer.add_child(_cost_bar)
+	_ready_label = UIKit.label("", 14, UIKit.C_TEXT)
+	_ready_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_ready_label.custom_minimum_size = Vector2(PANEL_W - 40, 34)
+	outer.add_child(_ready_label)
+	# --- actions
+	_launch = UIKit.button("M1_TO_REVIEW", Vector2(0, 44))
+	_launch.add_theme_font_size_override("font_size", 20)
+	_launch.pressed.connect(func(): launch_requested.emit(build.duplicate()))
+	outer.add_child(_launch)
+	var nav := UIKit.hbox(6)
+	var back := UIKit.button("BTN_BACK", Vector2(0, 34))
+	back.name = "BackButton"
+	back.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	back.add_theme_font_size_override("font_size", 15)
+	back.pressed.connect(func(): back_requested.emit())
+	nav.add_child(back)
+	var miss := UIKit.button("BTN_MISSIONS", Vector2(0, 34))
+	miss.name = "MissionsButton"
+	miss.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	miss.add_theme_font_size_override("font_size", 15)
+	miss.pressed.connect(func(): missions_requested.emit())
+	nav.add_child(miss)
+	outer.add_child(nav)
 	return p
 
 
@@ -423,7 +410,7 @@ func _refresh() -> void:
 		(row["remove"] as Button).disabled = id == ""
 		var required := REQUIRED.has(slot)
 		var tl: Label = row["title"]
-		tl.text = "%s%s" % [tr(SLOT_KEYS[slot]), (" *  " + tr("M1_REQUIRED")) if (required and id == "") else ("  (" + tr("M1_REQUIRED") + ")" if required else "")]
+		tl.text = "%s%s" % [tr(SLOT_KEYS[slot]), " *" if required else ""]
 		tl.add_theme_color_override("font_color", UIKit.C_BAD if (required and id == "") else (UIKit.C_GOOD if id != "" else UIKit.C_MUTED))
 		if required and id == "":
 			lab.text = "M1_NOT_INSTALLED"

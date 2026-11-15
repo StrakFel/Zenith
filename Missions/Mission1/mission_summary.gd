@@ -79,20 +79,31 @@ func setup(design: Dictionary, sat: Dictionary, rk: Dictionary, rocket: Dictiona
 		row.add_child(bar)
 		row.add_child(UIKit.label("%d%%" % int(r * 100.0), 14, Color.WHITE))
 		body.add_child(row)
-	var af := CheckButton.new()
-	af.text = "SUM_AUTOFLIGHT"
-	af.name = "AutoflightCheck"
-	af.button_pressed = bool(GameState.settings["autoflight"])
-	af.focus_mode = Control.FOCUS_NONE
-	af.toggled.connect(func(on: bool): GameState.set_setting("autoflight", on))
-	body.add_child(af)
-	var gl := CheckButton.new()
-	gl.text = "SUM_GUIDED"
-	gl.name = "GuidedCheck"
-	gl.button_pressed = bool(GameState.settings["guided"])
-	gl.focus_mode = Control.FOCUS_NONE
-	gl.toggled.connect(func(on: bool): GameState.set_setting("guided", on))
-	body.add_child(gl)
+	body.add_child(UIKit.label("SUM_FLIGHT_MODE", 15, UIKit.C_ACCENT))
+	var fm_row := UIKit.hbox(8)
+	fm_row.name = "FlightModeRow"
+	body.add_child(fm_row)
+	var fm_desc := UIKit.label("FM_AUTO_D", 13, UIKit.C_MUTED)
+	fm_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	fm_desc.custom_minimum_size.x = 380
+	var fm_group := ButtonGroup.new()
+	for it in [["FM_AUTO", "auto"], ["FM_ASSISTED", "assisted"], ["FM_MANUAL", "manual"]]:
+		var fb := Button.new()
+		fb.text = str(it[0])
+		fb.name = "Mode_" + str(it[1])
+		fb.toggle_mode = true
+		fb.button_group = fm_group
+		fb.focus_mode = Control.FOCUS_NONE
+		fb.custom_minimum_size = Vector2(0, 38)
+		fb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		fb.button_pressed = str(GameState.settings["flight_mode"]) == str(it[1])
+		var mid := str(it[1])
+		fb.pressed.connect(func():
+			GameState.set_flight_mode(mid)
+			fm_desc.text = "FM_%s_D" % mid.to_upper())
+		fm_row.add_child(fb)
+	fm_desc.text = "FM_%s_D" % str(GameState.settings["flight_mode"]).to_upper()
+	body.add_child(fm_desc)
 	var note := UIKit.label("SUM_NOTE", 12, UIKit.C_MUTED)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.add_child(note)

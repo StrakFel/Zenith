@@ -148,6 +148,7 @@ func _on_mission_start() -> void:
 	world_layer.add_child(design_view)
 	design_view.design_done.connect(_on_design_done)
 	design_view.back_requested.connect(func(): Router.go_to(Router.MISSION_SELECT))
+	cam_hint.set_bottom(true, 6.0, true)       # short camera help between the two panels, fades; F1 shows it again
 
 
 ## Step 1-2 finished: the satellite is designed, now design the rocket for it.
@@ -185,6 +186,7 @@ func _on_assembly_back() -> void:
 	if profile.is_empty():
 		design_view = MissionDesignView.new()
 		design_view.design = design.duplicate()
+		cam_hint.set_bottom(true, 6.0, true)
 		world_layer.add_child(design_view)
 		design_view.design_done.connect(_on_design_done)
 		design_view.back_requested.connect(func(): Router.go_to(Router.MISSION_SELECT))
@@ -261,12 +263,17 @@ func dev_skip_briefing_if_needed() -> void:
 func _update_assembly_camera(delta: float) -> void:
 	var center := pad_scene.rocket_pivot.global_position
 	var h := pad_scene.rocket.total_height()
-	var az := deg_to_rad(28.0 + 20.0 * sin(_t_asm * 0.22))
-	var r := maxf(125.0, h * 2.3)
-	# the designer panel covers the right part of the screen: shift the view so the rocket stands in the free area (left)
-	var shift := Vector3(cos(az), 0.0, -sin(az)) * r * (0.34 if assembly != null else 0.0)
-	pad_scene.orbit.update(delta, center + Vector3(sin(az) * r, 6.0 + 2.0 * sin(_t_asm * 0.3), cos(az) * r) + shift,
-		center + Vector3(0, -2, 0) + shift, 36.0)
+	var az := deg_to_rad(28.0)                        # fixed view: the background must not drift while parts are chosen
+	var r := maxf(150.0, h * 2.6)
+	# the designer panel covers the right part of the screen: shift the view so the rocket stands in the middle of the free area (left)
+	var shift := Vector3.ZERO
+	if assembly != null:
+		var vs := get_viewport().get_visible_rect().size
+		var free_c := (16.0 + (vs.x - 16.0 - AssemblyView.PANEL_W - 14.0)) * 0.5
+		var frac := (vs.x * 0.5 - free_c) / vs.x
+		var half_w := tan(deg_to_rad(36.0) * 0.5) * (vs.x / vs.y)
+		shift = Vector3(cos(az), 0.0, -sin(az)) * r * half_w * 2.0 * frac
+	pad_scene.orbit.update(delta, center + Vector3(sin(az) * r, 6.0, cos(az) * r) + shift, center + Vector3(0, -2, 0) + shift, 36.0)
 
 
 ## Developer/test helper: build a rocket and go straight to the launch (skips the countdown).
@@ -656,8 +663,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey) or not event.pressed or event.echo:
 		return
 	if event.keycode == KEY_F1:
-		cam_hint.toggle_help()
-		return
+		return          # F1 is handled by the camera hint itself
 	if state == S.FLIGHT and not dev_autopilot and hud != null:
 		if event.keycode == KEY_M:
 			_set_auto(not auto_flight)
