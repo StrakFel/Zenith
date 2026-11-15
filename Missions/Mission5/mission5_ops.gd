@@ -206,7 +206,7 @@ func _ret_execute() -> void:
 			var y0 := lander_view.position.y
 			tw.tween_method(func(k: float):
 				lander_view.position.y = y0 + k * k * 500.0
-				lander_view.update_view(1.0, 60.0 + k * 400.0, y0), 0.0, 1.0, 4.0)
+				lander_view.update_view(1.0, 60.0 + k * 400.0, y0), 0.0, 1.0, 2.0)
 			await tw.finished
 			Sfx.loop_stop("rumble")
 			lander_view.update_view(0.0, 400.0, y0)

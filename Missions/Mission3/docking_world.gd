@@ -11,10 +11,10 @@ signal collided
 const PORT := Vector2.ZERO
 const NOSE := 4.6
 const SHIP_R := 2.5
-const ACC := 0.5
-const ACC_FINE := 0.16
-const ROT_ACC := 0.5
-const ROT_ACC_FINE := 0.16
+const ACC := 1.5                 # snappier thrusters: the manoeuvres take a third of the time
+const ACC_FINE := 0.5
+const ROT_ACC := 1.4
+const ROT_ACC_FINE := 0.45
 const FUEL_MAX := 60.0
 const FUEL_TRANS := 1.0
 const FUEL_ROT := 0.15
@@ -26,7 +26,7 @@ const TOL_LAT_RATE := 0.3
 const TOL_OMEGA := 0.052       # ~3 deg/s
 
 var pos := Vector2(-300.0, 30.0)
-var vel := Vector2(4.0, -0.12)      # faster approach (was 2 m/s)
+var vel := Vector2(6.0, -0.12)      # fast approach (was 2 m/s)
 var angle := 0.5
 var omega := 0.0
 var fuel := FUEL_MAX
@@ -95,7 +95,7 @@ func step(delta: float, fwd: float, strafe: float, rot: float, fine: bool, kill_
 		queue_redraw()
 		return
 	var wdt := delta
-	if warp > 1 and range_to_port() > 150.0:
+	if warp > 1 and range_to_port() > 100.0:
 		wdt = delta * float(warp)
 		fwd = 0.0
 		strafe = 0.0
