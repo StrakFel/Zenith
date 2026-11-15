@@ -58,7 +58,7 @@ static func default_design(id: String) -> Dictionary:
 		_:
 			var d := LunarDesign.default_design()
 			d["capsule"] = "light"
-			d["ascent"] = "s"
+			d["ascent"] = "m"
 			return d
 
 
@@ -212,6 +212,11 @@ static func requirements(id: String, d: Dictionary, rocket: Dictionary) -> Array
 				"value": "%d %s" % [int(ls["dv_descent"]), TranslationServer.translate("UNIT_MS")], "hint": "LUNREQH_DV"})
 			out.append({"id": "lpow", "key": "LUNREQ_POWER", "level": 0 if float(ls["power_ratio"]) >= 1.0 else (1 if float(ls["power_ratio"]) >= 0.8 else 2),
 				"value": "%d / %d Wh" % [int(ls["supply_wh"]), int(ls["need_wh"])], "hint": "LUNREQH_POWER"})
+			# the way home: ascent from the Moon (1700 m/s) + the trans-Earth burn run on the ascent stage's surplus delta-v
+			var asc_dv := float(MOON_ASCENT[d["ascent"]]["dv"])
+			var asc_need := 1770.0
+			out.append({"id": "ret", "key": "M5REQ_RETURN", "level": 0 if asc_dv >= asc_need else 2,
+				"value": "%d / %d %s" % [int(asc_dv), int(asc_need), TranslationServer.translate("UNIT_MS")], "hint": "M5REQH_RETURN"})
 	return out
 
 

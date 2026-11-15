@@ -26,6 +26,13 @@ var state: int = S.DESIGN
 var design: Dictionary = {}
 var st: Dictionary = {}
 var dev_autopilot := false
+
+
+## True while an autopilot (the test pilot, or the default "Automatic" flight mode of Mission 5) flies the vehicle.
+func _is_auto() -> bool:
+	return dev_autopilot
+
+
 var inspecting := false
 
 var design_view: LunarDesignView
@@ -490,14 +497,14 @@ func _lander_autopilot() -> Vector2:
 	if h < 25.0:
 		target_angle = clampf(ex * 0.08, -0.1, 0.1)
 	var turn := clampf((target_angle - lm.angle) * 3.0 - lm.omega * 3.5, -1.0, 1.0)
-	var vy_t := -clampf(h * 0.07, 0.9, 38.0)
+	var vy_t := -clampf(h * 0.1, 1.3, 40.0)
 	var acc_max := lm.thrust_max / lm.mass()
 	var want := (LanderModel.G + (vy_t - lm.vel.y) * 1.3) / maxf(cos(lm.angle), 0.5)
 	return Vector2(clampf(want / acc_max, 0.0, 1.0), turn)
 
 
 func _update_descent(delta: float) -> void:
-	var inp := _lander_autopilot() if dev_autopilot else _descent_input()
+	var inp := _lander_autopilot() if _is_auto() else _descent_input()
 	var thr_cmd := inp.x
 	_acc += delta
 	var steps := 0
@@ -661,8 +668,8 @@ func _update_surface(delta: float) -> void:
 	var vmax := float(st["rover_speed"]) * SURFACE_PACE
 	var inp := Vector2.ZERO
 	if not _battery_dead and _sampling < 0:
-		inp = _rover_autopilot() if dev_autopilot else _rover_input()
-	elif dev_autopilot and _sampling < 0:
+		inp = _rover_autopilot() if _is_auto() else _rover_input()
+	elif _is_auto() and _sampling < 0:
 		inp = Vector2.ZERO
 	var target := inp.x * vmax
 	r_speed = move_toward(r_speed, target, 4.0 * SURFACE_PACE * delta)
@@ -696,9 +703,9 @@ func _update_surface(delta: float) -> void:
 	_place_rover()
 	_update_surface_hud(cap)
 	var all_done := r_samples >= 3
-	if dev_autopilot and (all_done or _battery_dead or r_time >= SURFACE_SECONDS):
+	if _is_auto() and (all_done or _battery_dead or r_time >= SURFACE_SECONDS):
 		_start_uplink()
-	elif not dev_autopilot and (_battery_dead or r_time >= SURFACE_SECONDS) and _sampling < 0:
+	elif not _is_auto() and (_battery_dead or r_time >= SURFACE_SECONDS) and _sampling < 0:
 		_start_uplink()
 
 

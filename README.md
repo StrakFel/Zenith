@@ -32,7 +32,7 @@ The four NASA mission segments are modelled: **Launch**, **Space**, **Ground** (
 | 2 | **Space Operations** | Design an EVA package (oxygen, gas, suit) and its launch vehicle, then perform a spacewalk repair. |
 | 3 | **ISS Expedition** | Design a science cargo and rocket, launch to the station, rendezvous and dock. |
 | 4 | **Satellite Constellation** | Heavy multi-stage rocket with boosters; deploy several satellites into evenly spaced orbital slots (prototype). |
-| 5 | **Moon and Return** | Heavy launch, trans-lunar burn, powered landing, rover science, ascent, trans-Earth burn and re-entry (return legs are a prototype). |
+| 5 | **Moon and Return** | Heavy launch, trans-lunar burn, lunar orbit insertion, lander separation and powered landing, astronaut EVA (drive, sample, return to the module), ascent and docking with the command ship, crew transfer, trans-Earth burn, capsule separation, re-entry, parachutes and splashdown. Every stage has an autopilot (default); the ascent stage and the capsule heat shield you chose decide success. |
 
 Missions unlock one after another and progress is saved. New rocket parts unlock as the campaign advances.
 A **Demo Mode** (Settings) unlocks every mission and adds a demonstration rocket in the designer.

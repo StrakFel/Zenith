@@ -32,8 +32,8 @@ func setup(roughness: float, seed_value: int) -> void:
 	stage.apply_look()
 	stage.spin = 0.00012
 	camera = Camera3D.new()
-	camera.far = 20_000_000.0
-	camera.near = 0.3
+	camera.far = 16_000_000.0         # far / near must stay below ~2e7 or the light culler cannot build the view frustum
+	camera.near = 0.8
 	camera.fov = 45.0
 	add_child(camera)
 	camera.make_current()
