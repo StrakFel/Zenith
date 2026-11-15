@@ -10,7 +10,7 @@ const G0 := 9.80665
 const ROT_ACC := 0.55            # rad/s^2 from the RCS
 const OMEGA_MAX := 0.9
 
-var pos := Vector2(-380.0, 1300.0)    # x downrange (m), y altitude (m); pad at x = 0
+var pos := Vector2(-280.0, 900.0)    # x downrange (m), y altitude (m); pad at x = 0
 var vel := Vector2(18.0, -30.0)
 var angle := 0.0                      # rad, + = nose tilted towards +x
 var omega := 0.0

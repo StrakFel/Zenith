@@ -303,9 +303,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		KEY_1:
 			world.warp = 1
 		KEY_2:
-			world.warp = 2
-		KEY_3:
 			world.warp = 4
+		KEY_3:
+			world.warp = 10
 
 
 ## Test pilot (Tools/e2e_m3.gd): PD attitude hold + velocity-shaping approach.
@@ -315,7 +315,7 @@ func _autopilot() -> Array:
 		rot = 0.0
 	var tip := world.nose_tip()
 	var ax := world.axial_distance()
-	var vx_t := clampf(ax * 0.04, 0.15, 2.5) if ax > 6.0 else 0.1
+	var vx_t := clampf(ax * 0.05, 0.15, 4.0) if ax > 6.0 else 0.1
 	var vy_t := clampf(-tip.y * 0.12, -0.6, 0.6)
 	var fwd := clampf((vx_t - world.vel.x) * 4.0, -1.0, 1.0)
 	var strafe := clampf((vy_t - world.vel.y) * 5.0, -1.0, 1.0)
@@ -324,7 +324,7 @@ func _autopilot() -> Array:
 	if absf(strafe) < 0.06:
 		strafe = 0.0
 	var calm := absf(tip.y) < 1.5 and absf(world.vel.y) < 0.06 and absf(world.angle_error()) < 0.05
-	world.warp = 4 if (ax > 150.0 and calm) else 1
+	world.warp = 10 if (ax > 150.0 and calm) else 1
 	return [fwd, strafe, rot]
 
 

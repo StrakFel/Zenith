@@ -14,10 +14,11 @@ const BURN_ERROR := 5.0                   # random engine cut-off error (m/s)
 const LAUNCH_COUNTDOWN := 3.0
 const LAUNCH_ASCENT := 8.0
 const COAST_SECONDS := 8.0
-const SURFACE_SECONDS := 240.0
+const SURFACE_PACE := 2.4              # the lunar-surface phase runs 2.4x faster (same energy balance: rover, sampling, day length scale together)
+const SURFACE_SECONDS := 240.0 / SURFACE_PACE
 const SURFACE_SCALE := LunarDesign.EXPLORE_HOURS * 3600.0 / SURFACE_SECONDS
 const POI_RADIUS := 7.0
-const SAMPLE_TIME := 5.0
+const SAMPLE_TIME := 5.0 / SURFACE_PACE
 const HEATER_W := 30.0
 const DRIVE_W := 90.0
 
@@ -653,16 +654,16 @@ func _start_sample(i: int) -> void:
 
 func _update_surface(delta: float) -> void:
 	r_time += delta
-	var vmax := float(st["rover_speed"])
+	var vmax := float(st["rover_speed"]) * SURFACE_PACE
 	var inp := Vector2.ZERO
 	if not _battery_dead and _sampling < 0:
 		inp = _rover_autopilot() if dev_autopilot else _rover_input()
 	elif dev_autopilot and _sampling < 0:
 		inp = Vector2.ZERO
 	var target := inp.x * vmax
-	r_speed = move_toward(r_speed, target, 4.0 * delta)
+	r_speed = move_toward(r_speed, target, 4.0 * SURFACE_PACE * delta)
 	if absf(r_speed) > 0.05:
-		r_head += inp.y * 1.1 * delta * signf(r_speed)
+		r_head += inp.y * 1.1 * SURFACE_PACE * delta * signf(r_speed)
 	var dir := Vector2(cos(r_head), sin(r_head))
 	r_pos += dir * r_speed * delta
 	r_pos += moon.nearest_obstacle_push(r_pos, 1.4)

@@ -1,4 +1,4 @@
-﻿class_name DockingWorld
+class_name DockingWorld
 extends Control
 ## Mission 3 world: a spacecraft with RCS thrusters (translation + rotation, full
 ## inertia) approaching the docking port of the station. Port at the origin,
@@ -25,12 +25,12 @@ const TOL_ANGLE := 0.105       # ~6 deg
 const TOL_LAT_RATE := 0.3
 const TOL_OMEGA := 0.052       # ~3 deg/s
 
-var pos := Vector2(-300.0, 52.0)
-var vel := Vector2(2.0, -0.12)
+var pos := Vector2(-300.0, 30.0)
+var vel := Vector2(4.0, -0.12)      # faster approach (was 2 m/s)
 var angle := 0.5
 var omega := 0.0
 var fuel := FUEL_MAX
-var warp := 1
+var warp := 8                       # time compression for the long far approach (drops to x1 inside 150 m)
 var finished := false
 var contact_result := ""
 var contact_speed := 0.0
@@ -95,7 +95,7 @@ func step(delta: float, fwd: float, strafe: float, rot: float, fine: bool, kill_
 		queue_redraw()
 		return
 	var wdt := delta
-	if warp > 1 and range_to_port() > 80.0:
+	if warp > 1 and range_to_port() > 150.0:
 		wdt = delta * float(warp)
 		fwd = 0.0
 		strafe = 0.0
