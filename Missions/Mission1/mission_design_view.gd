@@ -45,7 +45,7 @@ class OptionCard extends Button:
 		pressed.connect(func(): Sfx.play("click"))
 
 
-const PANEL_W := 470.0
+const PANEL_W := 500.0
 
 
 func _ready() -> void:
@@ -66,6 +66,7 @@ func _ready() -> void:
 	right.offset_right = -16
 	right.offset_top = 16
 	right.offset_bottom = -68
+	right.grow_horizontal = Control.GROW_DIRECTION_BEGIN     # if the content is wider it grows to the left, never off-screen
 	add_child(right)
 	_rebuild_sat()
 	_refresh()

@@ -52,7 +52,7 @@ func _layout() -> void:
 		if _bottom_mid:      # design screen: exactly under the left panel, same width
 			_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 			_panel.offset_left = 16
-			_panel.offset_right = 16 + 470
+			_panel.offset_right = 16 + 500
 		else:                # left, in the free 3D area next to the designer panel
 			_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 			_panel.offset_left = 16
@@ -118,7 +118,7 @@ func set_bottom(on: bool, seconds: float = 0.0, middle: bool = false) -> void:
 	_bottom = on
 	_bottom_mid = middle
 	if on:
-		_label.custom_minimum_size.x = 440.0 if middle else 292.0
+		_label.custom_minimum_size.x = 470.0 if middle else 292.0
 		_label.text = "CAM_HINT_SHORT"
 	else:
 		_label.text = "CAM_HINT_MISSION" if _mission_mode else "CAM_HINT_MENU"
