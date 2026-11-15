@@ -74,11 +74,7 @@ func _ready() -> void:
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(spacer)
-	v.add_child(UIKit.label("MENU_FOOTER", 14, UIKit.C_MUTED))
 
-	var cam_hint := CameraHint.new()
-	root.add_child(cam_hint)
-	cam_hint.setup(false, -1.0, true)
 	title.modulate.a = 0.0
 	tag.modulate.a = 0.0
 	create_tween().tween_property(title, "modulate:a", 1.0, 1.2)
